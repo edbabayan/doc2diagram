@@ -1,0 +1,2 @@
+dotenv==0.9.9
+atlassian-python-api==4.0.3
