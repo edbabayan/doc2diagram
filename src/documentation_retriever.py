@@ -1,4 +1,5 @@
 import os
+import json
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -31,15 +32,10 @@ def search_pages(space: str = None, title: str = None, label: str = None, limit:
 
     return confluence.cql(cql=cql_query, limit=limit)
 
-def get_page_contents(pages, include_children: bool = True):
-    contents = []
-
-    for page in pages.get("results", []):
-        page_id = page["content"]["id"]
-        title = page["content"]["title"]
-
-        # Get full content
+def get_desc_page_contents(pages, include_children: bool = True):
+    def fetch_page_recursive(page_id):
         full_page = confluence.get_page_by_id(page_id, expand="body.storage")
+        title = full_page["title"]
         html_content = full_page["body"]["storage"]["value"]
 
         page_data = {
@@ -49,29 +45,36 @@ def get_page_contents(pages, include_children: bool = True):
             "children": []
         }
 
-        contents.append(page_data)
-
         if include_children:
             child_pages = confluence.get_child_pages(page_id)
             for child in child_pages:
-                child_id = child["id"]
-                child_title = child["title"]
-                child_full = confluence.get_page_by_id(child_id, expand="body.storage")
-                child_content = child_full["body"]["storage"]["value"]
+                child_data = fetch_page_recursive(child["id"])
+                page_data["children"].append(child_data)
 
-                page_data["children"].append({
-                    "id": child_id,
-                    "title": child_title,
-                    "content": child_content
-                })
+        return page_data
 
+    contents = []
+
+    for page in pages.get("results", []):
+        page_id = page["content"]["id"]
+        page_data = fetch_page_recursive(page_id)
         contents.append(page_data)
 
     return contents
 
+def print_page_tree(pages, indent=0):
+    for page in pages:
+        print("    " * indent + f"- {page['title']} (ID: {page['id']})")
+        if page["children"]:
+            print_page_tree(page["children"], indent + 1)
+
 
 if __name__ == '__main__':
     results = search_pages(space="EPMRPP", title="ReportPortal Contributors")
-    pages_with_content = get_page_contents(results)
+    pages_with_content = get_desc_page_contents(results)
+    print_page_tree(pages_with_content)
 
-    print('')
+    # Save to JSON
+    output_path = root / "confluence_page_tree.json"
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(pages_with_content, f, ensure_ascii=False, indent=2)
