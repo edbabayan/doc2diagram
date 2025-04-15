@@ -4,6 +4,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from atlassian import Confluence
+from src.utils import convert_html_to_markdown
+
 
 # Set the root directory to the parent of the current file's directory
 root = Path(__file__).parent.parent
@@ -37,11 +39,12 @@ def get_desc_page_contents(pages, include_children: bool = True):
         full_page = confluence.get_page_by_id(page_id, expand="body.storage")
         title = full_page["title"]
         html_content = full_page["body"]["storage"]["value"]
+        markdown_content = convert_html_to_markdown(html_content)
 
         page_data = {
             "id": page_id,
             "title": title,
-            "content": html_content,
+            "content": markdown_content,
             "children": []
         }
 
