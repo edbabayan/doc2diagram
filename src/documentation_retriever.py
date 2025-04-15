@@ -31,23 +31,44 @@ def search_pages(space: str = None, title: str = None, label: str = None, limit:
 
     return confluence.cql(cql=cql_query, limit=limit)
 
-def get_page_contents(pages):
+def get_page_contents(pages, include_children: bool = True):
     contents = []
 
     for page in pages.get("results", []):
         page_id = page["content"]["id"]
         title = page["content"]["title"]
 
-        # Get full content (e.g. body.storage gives HTML content)
-        full_page = confluence.get_page_by_id(
-            page_id,
-            expand="body.storage"
-        )
-
+        # Get full content
+        full_page = confluence.get_page_by_id(page_id, expand="body.storage")
         html_content = full_page["body"]["storage"]["value"]
-        contents.append({"id": page_id, "title": title, "content": html_content})
+
+        page_data = {
+            "id": page_id,
+            "title": title,
+            "content": html_content,
+            "children": []
+        }
+
+        contents.append(page_data)
+
+        if include_children:
+            child_pages = confluence.get_child_pages(page_id)
+            for child in child_pages:
+                child_id = child["id"]
+                child_title = child["title"]
+                child_full = confluence.get_page_by_id(child_id, expand="body.storage")
+                child_content = child_full["body"]["storage"]["value"]
+
+                page_data["children"].append({
+                    "id": child_id,
+                    "title": child_title,
+                    "content": child_content
+                })
+
+        contents.append(page_data)
 
     return contents
+
 
 if __name__ == '__main__':
     results = search_pages(space="EPMRPP", title="ReportPortal Contributors")
