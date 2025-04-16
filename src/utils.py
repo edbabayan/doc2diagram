@@ -33,3 +33,28 @@ def convert_html_to_markdown(html_content: str) -> str:
     markdown_content = h.handle(html_content)
 
     return markdown_content
+
+def extract_attachments_by_name(client, page_id, attachment_names):
+    """
+    Extract attachments from a Confluence page by their names.
+    Args:
+        client (Confluence): The Confluence client instance.
+        page_id (str): The ID of the Confluence page.
+        attachment_names (list): List of attachment filenames to extract.
+    Returns:
+        list: List of matching attachment URLs.
+    """
+    # Fetch all attachments for the page
+    attachments = client.get_attachments_from_content(page_id, expand="body.storage")
+    # Filter attachments by their filenames
+    matching_attachments = [attachment for attachment in attachments["results"]
+        if attachment["title"] in attachment_names
+    ]
+    # Extract the download links for the matching attachments
+    attachment_urls = [
+        attachment["_links"]["download"] for attachment in matching_attachments
+    ]
+    # Prepend the base URL to the download links
+    base_url = os.environ["CONFLUENCE_URL"]
+    full_urls = [f"{base_url}{url}" for url in attachment_urls]
+    return full_urls
