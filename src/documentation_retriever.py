@@ -4,7 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from atlassian import Confluence
-from src.utils import convert_html_to_markdown
+from src.utils import convert_html_to_markdown, extract_attached_filenames, extract_attachments_by_name
 
 
 # Set the root directory to the parent of the current file's directory
@@ -40,12 +40,17 @@ def get_desc_page_contents(pages, include_children: bool = True):
         title = full_page["title"]
         html_content = full_page["body"]["storage"]["value"]
         markdown_content = convert_html_to_markdown(html_content)
+        # Extract images and attachments
+        attach_filenames = extract_attached_filenames(html_content)
+        # Extract attachments by their names
+        attachments = extract_attachments_by_name(confluence, page_id, attach_filenames)
 
         page_data = {
             "id": page_id,
             "title": title,
             "content": markdown_content,
-            "children": []
+            "attachments": attachments,
+            "children": [],
         }
 
         if include_children:
@@ -73,7 +78,7 @@ def print_page_tree(pages, indent=0):
 
 
 if __name__ == '__main__':
-    results = search_pages(space="EPMRPP", title="ReportPortal Contributors")
+    results = search_pages(space="EPMRPP", title="UX / UI")
     pages_with_content = get_desc_page_contents(results)
     print_page_tree(pages_with_content)
 
