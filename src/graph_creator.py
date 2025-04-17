@@ -1,16 +1,10 @@
-import os
 import json
 from pathlib import Path
 from graphviz import Digraph
 
-from dotenv import load_dotenv
-
 
 # Set the root directory to the parent of the current file's directory
 root = Path(__file__).parent.parent
-
-# Load the environment variables
-load_dotenv(dotenv_path=root.joinpath(".env"))
 
 json_path = root / "confluence_page_tree.json"
 
@@ -20,6 +14,7 @@ with open(json_path, "r") as file:
 # Initialize Graphviz Digraph
 dot = Digraph(comment="Confluence Page Tree", format='png')
 dot.attr(rankdir='TB')  # Top to bottom layout
+dot.attr(dpi='300')  # Set higher resolution
 
 def add_nodes(node, parent_id=None):
     node_id = node["id"]
