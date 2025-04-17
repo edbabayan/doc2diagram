@@ -4,7 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from atlassian import Confluence
-from src.utils import convert_html_to_markdown, extract_attached_filenames, extract_attachments_by_name
+from src.utils import convert_html_to_markdown_with_attachments, extract_attached_filenames, extract_attachments_by_name
 
 
 # Set the root directory to the parent of the current file's directory
@@ -39,17 +39,23 @@ def get_desc_page_contents(pages, include_children: bool = True):
         full_page = confluence.get_page_by_id(page_id, expand="body.storage")
         title = full_page["title"]
         html_content = full_page["body"]["storage"]["value"]
-        markdown_content = convert_html_to_markdown(html_content)
+
         # Extract images and attachments
         attach_filenames = extract_attached_filenames(html_content)
+
         # Extract attachments by their names
         attachments = extract_attachments_by_name(confluence, page_id, attach_filenames)
+
+        # Replace attachment references in the HTML content with their URLs
+        for filename, url in zip(attach_filenames, attachments):
+            html_content = html_content.replace(filename, url)
+
+        markdown_content = convert_html_to_markdown_with_attachments(html_content)
 
         page_data = {
             "id": page_id,
             "title": title,
             "content": markdown_content,
-            "attachments": attachments,
             "children": [],
         }
 
@@ -69,6 +75,7 @@ def get_desc_page_contents(pages, include_children: bool = True):
         contents.append(page_data)
 
     return contents
+
 
 def print_page_tree(pages, indent=0):
     for page in pages:
