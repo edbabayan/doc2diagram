@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 
 from atlassian import Confluence
 from src.utils import convert_html_to_markdown_with_attachments, extract_attached_filenames, extract_attachments_by_name
+from src.chunker import hierarchical_title_chunking
 
 
 # Set the root directory to the parent of the current file's directory
@@ -55,15 +56,15 @@ def get_desc_page_contents(pages, include_children: bool = True):
         page_data = {
             "id": page_id,
             "title": title,
-            "content": markdown_content,
-            "children": [],
+            "content": hierarchical_title_chunking(markdown_content),
+            "child_pages": [],
         }
 
         if include_children:
             child_pages = confluence.get_child_pages(page_id)
             for child in child_pages:
                 child_data = fetch_page_recursive(child["id"])
-                page_data["children"].append(child_data)
+                page_data["child_pages"].append(child_data)
 
         return page_data
 
@@ -80,8 +81,8 @@ def get_desc_page_contents(pages, include_children: bool = True):
 def print_page_tree(pages, indent=0):
     for page in pages:
         print("    " * indent + f"- {page['title']} (ID: {page['id']})")
-        if page["children"]:
-            print_page_tree(page["children"], indent + 1)
+        if page["child_pages"]:
+            print_page_tree(page["child_pages"], indent + 1)
 
 
 if __name__ == '__main__':
