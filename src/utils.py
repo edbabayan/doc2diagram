@@ -13,24 +13,40 @@ def extract_attached_filenames(html_content):
     return images + attachments
 
 
-def convert_html_to_markdown(html_content: str) -> str:
+def convert_html_to_markdown_with_attachments(html_content: str) -> str:
     """
-    Converts HTML content to Markdown format.
+    Converts HTML content to Markdown format, preserving Confluence attachments.
 
     Args:
         html_content (str): The HTML content to be converted.
 
     Returns:
-        str: The converted Markdown content.
+        str: The converted Markdown content with attachments preserved.
     """
-    # Create an instance of the html2text.HTML2Text class
+    soup = BeautifulSoup(html_content, "html.parser")
+
+    # Replace <ac:image> with Markdown ![]() using <ri:attachment>
+    for ac_image in soup.find_all("ac:image"):
+        attachment = ac_image.find("ri:attachment")
+        if attachment and attachment.has_attr("ri:filename"):
+            img_url = attachment["ri:filename"]
+            filename = img_url.split("/")[-1]
+            markdown_img = f"![{filename}]({img_url})"
+            ac_image.replace_with(markdown_img)
+
+    # Replace <ac:link> that wraps an attachment with a Markdown link
+    for ac_link in soup.find_all("ac:link"):
+        attachment = ac_link.find("ri:attachment")
+        link_text = ac_link.get_text(strip=True)
+        if attachment and attachment.has_attr("ri:filename"):
+            file_url = attachment["ri:filename"]
+            markdown_link = f"[{link_text}]({file_url})"
+            ac_link.replace_with(markdown_link)
+
+    # Convert the rest of the cleaned HTML
     h = html2text.HTML2Text()
-
-    # Disable wrapping of lines to make it more readable
     h.body_width = 0
-
-    # Convert the HTML to Markdown
-    markdown_content = h.handle(html_content)
+    markdown_content = h.handle(str(soup))
 
     return markdown_content
 
@@ -46,15 +62,19 @@ def extract_attachments_by_name(client, page_id, attachment_names):
     """
     # Fetch all attachments for the page
     attachments = client.get_attachments_from_content(page_id, expand="body.storage")
+
     # Filter attachments by their filenames
     matching_attachments = [attachment for attachment in attachments["results"]
         if attachment["title"] in attachment_names
     ]
+
     # Extract the download links for the matching attachments
     attachment_urls = [
         attachment["_links"]["download"] for attachment in matching_attachments
     ]
+
     # Prepend the base URL to the download links
     base_url = os.environ["CONFLUENCE_URL"]
     full_urls = [f"{base_url}{url}" for url in attachment_urls]
+
     return full_urls
