@@ -1,17 +1,6 @@
 import re
-import json
-
-from pathlib import Path
 from typing import List, Dict
 
-
-# Set the root directory to the parent of the current file's directory
-root = Path(__file__).parent.parent
-
-json_path = root / "confluence_page_tree.json"
-
-with open(json_path, "r") as file:
-    data = json.load(file)
 
 def hierarchical_title_chunking(text: str) -> List[Dict]:
     lines = text.splitlines()
