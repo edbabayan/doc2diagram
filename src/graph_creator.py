@@ -127,6 +127,6 @@ dot.attr('graph', splines='ortho')  # Use orthogonal splines for cleaner layout
 
 # Save and render
 output_path = Path("confluence_title_hierarchy_diagram")
-dot.render(output_path, view=True)
+dot.render(output_path, view=False, cleanup=True)
 print(f"Diagram saved to: {output_path}.png")
 
