@@ -1,18 +1,17 @@
 import os
 import json
-from pathlib import Path
 from dotenv import load_dotenv
 
 from atlassian import Confluence
-from src.utils import convert_html_to_markdown_with_attachments, extract_attached_filenames, extract_attachments_by_name
-from src.chunker import hierarchical_title_chunking
 
+from src.config import CFG
+from src.chunker import hierarchical_title_chunking, html_chunking
+from src.utils import (convert_html_to_markdown_with_attachments, extract_attached_filenames,
+                       extract_attachments_by_name, clean_header_tags)
 
-# Set the root directory to the parent of the current file's directory
-root = Path(__file__).parent.parent
 
 # Load the environment variables
-load_dotenv(dotenv_path=root.joinpath(".env"))
+load_dotenv(dotenv_path=CFG.root.joinpath(".env"))
 
 # Initialize the ConfluenceLoader with the environment variables
 confluence = Confluence(
@@ -35,6 +34,7 @@ def search_pages(space: str = None, title: str = None, label: str = None, limit:
 
     return confluence.cql(cql=cql_query, limit=limit)
 
+
 def get_desc_page_contents(pages, include_children: bool = True):
     def fetch_page_recursive(page_id):
         full_page = confluence.get_page_by_id(page_id, expand="body.storage")
@@ -51,12 +51,17 @@ def get_desc_page_contents(pages, include_children: bool = True):
         for filename, url in zip(attach_filenames, attachments):
             html_content = html_content.replace(filename, url)
 
-        markdown_content = convert_html_to_markdown_with_attachments(html_content)
+        cleaned_html = clean_header_tags(html_content)
+
+        # markdown_content = convert_html_to_markdown_with_attachments(html_content)
+
+        # chunks = hierarchical_title_chunking(markdown_content)
+        chunks = html_chunking(cleaned_html, CFG.HEADERS_TO_SPLIT_ON)
 
         page_data = {
             "id": page_id,
             "title": title,
-            "content": hierarchical_title_chunking(markdown_content),
+            "content": chunks,
             "child_pages": [],
         }
 
@@ -91,6 +96,6 @@ if __name__ == '__main__':
     print_page_tree(pages_with_content)
 
     # Save to JSON
-    output_path = root / "confluence_page_tree.json"
+    output_path = CFG.root / "confluence_page_tree.json"
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(pages_with_content, f, ensure_ascii=False, indent=2)
