@@ -1,7 +1,7 @@
 import re
 from typing import List, Dict
-from bs4 import BeautifulSoup
 
+from langchain.text_splitter import HTMLHeaderTextSplitter
 
 
 def hierarchical_title_chunking(text: str) -> List[Dict]:
@@ -37,3 +37,11 @@ def hierarchical_title_chunking(text: str) -> List[Dict]:
                 stack[-1]['chunk_text'] += line + '\n'
 
     return chunks
+
+
+def html_chunking(html: str, splitting_headers: list[str]) -> List[str]:
+
+    header_splitter = HTMLHeaderTextSplitter(headers_to_split_on=splitting_headers)
+    chunks = header_splitter.split_text(html)
+
+    return  chunks
