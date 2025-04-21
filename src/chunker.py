@@ -3,17 +3,6 @@ from typing import List, Dict
 from bs4 import BeautifulSoup
 
 
-def clean_header_tags(html: str) -> str:
-    soup = BeautifulSoup(html, "lxml")
-    for tag_name in ["h1", "h2", "h3", "h4"]:
-        for tag in soup.find_all(tag_name):
-            # Remove <br> tags from header contents
-            for br in tag.find_all("br"):
-                br.extract()
-            # Replace header contents with plain text
-            tag.string = tag.get_text(strip=True)
-    return str(soup)
-
 
 def hierarchical_title_chunking(text: str) -> List[Dict]:
     lines = text.splitlines()

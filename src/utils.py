@@ -78,3 +78,15 @@ def extract_attachments_by_name(client, page_id, attachment_names):
     full_urls = [f"{base_url}{url}" for url in attachment_urls]
 
     return full_urls
+
+
+def clean_header_tags(html: str) -> str:
+    soup = BeautifulSoup(html, "lxml")
+    for tag_name in ["h1", "h2", "h3", "h4"]:
+        for tag in soup.find_all(tag_name):
+            # Remove <br> tags from header contents
+            for br in tag.find_all("br"):
+                br.extract()
+            # Replace header contents with plain text
+            tag.string = tag.get_text(strip=True)
+    return str(soup)
