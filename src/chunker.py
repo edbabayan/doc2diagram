@@ -1,5 +1,6 @@
 import re
 from typing import List, Dict
+from collections import defaultdict
 
 from langchain.text_splitter import HTMLHeaderTextSplitter
 
@@ -39,9 +40,20 @@ def hierarchical_title_chunking(text: str) -> List[Dict]:
     return chunks
 
 
-def html_chunking(html: str, splitting_headers: list[str]) -> List[str]:
-
+def html_chunking(html: str, splitting_headers: list[tuple[str, str]]) -> List[str]:
     header_splitter = HTMLHeaderTextSplitter(headers_to_split_on=splitting_headers)
     chunks = header_splitter.split_text(html)
 
-    return  chunks
+    merged = defaultdict(list)
+    for chunk in chunks:
+        key = tuple(sorted(chunk.metadata.items()))  # Use metadata as grouping key
+        merged[key].append(chunk.page_content.strip())
+
+    # Combine the chunks per header
+    final_chunks = []
+    for metadata_tuple, content_list in merged.items():
+        metadata_dict = dict(metadata_tuple)
+        combined_content = "\n".join(content_list)
+        final_chunks.append({"metadata": metadata_dict, "page_content": combined_content})
+
+    return final_chunks
