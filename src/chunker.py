@@ -3,7 +3,7 @@ from typing import List, Dict
 from bs4 import BeautifulSoup
 
 
-def (html: str) -> str:
+def clean_header_tags(html: str) -> str:
     soup = BeautifulSoup(html, "lxml")
     for tag_name in ["h1", "h2", "h3", "h4"]:
         for tag in soup.find_all(tag_name):
