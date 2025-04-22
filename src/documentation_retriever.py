@@ -5,9 +5,8 @@ from dotenv import load_dotenv
 from atlassian import Confluence
 
 from src.config import CFG
-from src.chunker import hierarchical_title_chunking, html_chunking
-from src.utils import (convert_html_to_markdown_with_attachments, extract_attached_filenames,
-                       extract_attachments_by_name, clean_header_tags)
+from src.chunker import header_chunker
+from src.utils import (extract_attached_filenames, extract_attachments_by_name, clean_header_tags)
 
 
 # Load the environment variables
@@ -53,10 +52,8 @@ def get_desc_page_contents(pages, include_children: bool = True):
 
         cleaned_html = clean_header_tags(html_content)
 
-        # markdown_content = convert_html_to_markdown_with_attachments(html_content)
-
         # chunks = hierarchical_title_chunking(markdown_content)
-        chunks = html_chunking(cleaned_html, CFG.HEADERS_TO_SPLIT_ON)
+        chunks = header_chunker(cleaned_html, CFG.HEADERS_TO_SPLIT_ON)
 
         page_data = {
             "id": page_id,
