@@ -1,6 +1,7 @@
 import os
 import html2text
 from bs4 import BeautifulSoup
+
 from atlassian import Confluence
 
 
@@ -87,6 +88,14 @@ def clean_header_tags(html: str) -> str:
             # Remove <br> tags from header contents
             for br in tag.find_all("br"):
                 br.extract()
-            # Replace header contents with plain text
-            tag.string = tag.get_text(strip=True)
+
+            # Get cleaned text
+            cleaned_text = tag.get_text(strip=True)
+
+            # Skip header if text is empty
+            if not cleaned_text:
+                tag.decompose()  # Completely remove the tag
+            else:
+                tag.string = cleaned_text  # Replace content with cleaned text
+
     return str(soup)
