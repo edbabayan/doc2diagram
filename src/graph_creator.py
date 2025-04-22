@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from graphviz import Digraph
+from collections import defaultdict
 
 # Set the root directory to the parent of the current file's directory
 root = Path(__file__).parent.parent
@@ -22,8 +23,8 @@ dot.graph_attr['ranksep'] = '0.7'
 # Define colors for different levels
 level_colors = {
     0: '#4285F4',  # Blue for pages
-    1: '#34A853',  # Green for content sections
-    2: '#FBBC05',  # Yellow for sub-sections
+    1: '#34A853',  # Green for content sections/subsections
+    2: '#FBBC05',  # Yellow for topics
     3: '#EA4335'  # Red for deeper content
 }
 
@@ -47,12 +48,13 @@ def add_page_node(node_id, title, level=0):
              tooltip=title)
 
 
-def add_content_node(node_id, title, content_index, level=1):
+def add_content_node(node_id, title, level=1, tooltip=""):
     """Add a content node with specific styling."""
     color = level_colors[min(level, 3)]
     label = truncate_text(title)
+
     if not title:
-        label = f"Content {content_index + 1}"
+        label = "Untitled Content"
 
     dot.node(node_id,
              label=label,
@@ -60,12 +62,12 @@ def add_content_node(node_id, title, content_index, level=1):
              style='filled',
              fillcolor=color,
              fontcolor='white',
-             tooltip=title)
+             tooltip=tooltip)
 
 
 def process_page(page, parent_id=None, level=0):
-    """Process a page and its content."""
-    page_id = page["id"]
+    """Process a page and its subsections/topics."""
+    page_id = str(page["id"])
     title = page["title"]
 
     # Add the page node
@@ -75,47 +77,51 @@ def process_page(page, parent_id=None, level=0):
     if parent_id:
         dot.edge(parent_id, page_id, label="child page", fontsize="10")
 
-    # Process content if any
+    # Process content with hierarchy if any
     if "content" in page and page["content"]:
-        for i, content_item in enumerate(page["content"]):
-            content_id = f"{page_id}_content_{i}"
-            content_title = content_item.get("title", "")
+        # Group content by subsection
+        subsections = defaultdict(list)
+        for content_item in page["content"]:
+            metadata = content_item.get("metadata", {})
+            subsection = metadata.get("Subsection", "")
+            topic = metadata.get("Topic", "")
 
-            # Add content node
-            add_content_node(content_id, content_title, i, level + 1)
+            # Add content item to its subsection group
+            subsections[subsection].append((topic, content_item))
 
-            # Connect page to content
-            dot.edge(page_id, content_id, label="contains", fontsize="10", style="dashed")
+        # Process each subsection and its topics
+        for i, (subsection_name, topics_list) in enumerate(subsections.items()):
+            if not subsection_name:  # Skip items without subsection
+                continue
 
-            # Process child chunks recursively
-            if "child_chunks" in content_item and content_item["child_chunks"]:
-                process_child_chunks(content_item["child_chunks"], content_id, level + 2)
+            # Create subsection node
+            subsection_id = f"{page_id}_subsection_{i}"
+            add_content_node(subsection_id, subsection_name, level=1, tooltip=f"Subsection: {subsection_name}")
+
+            # Connect page to subsection
+            dot.edge(page_id, subsection_id, label="contains", fontsize="10", style="dashed")
+
+            # Process topics under this subsection
+            topic_dict = defaultdict(list)
+            for topic_name, content_item in topics_list:
+                topic_dict[topic_name].append(content_item)
+
+            # Create topic nodes under the subsection
+            for j, (topic_name, content_items) in enumerate(topic_dict.items()):
+                if not topic_name:  # Skip items without topic
+                    continue
+
+                # Create topic node
+                topic_id = f"{subsection_id}_topic_{j}"
+                add_content_node(topic_id, topic_name, level=2, tooltip=f"Topic: {topic_name}")
+
+                # Connect subsection to topic
+                dot.edge(subsection_id, topic_id, label="contains", fontsize="10", style="dotted")
 
     # Process child pages recursively
     if "child_pages" in page and page["child_pages"]:
         for child_page in page["child_pages"]:
             process_page(child_page, page_id, level)
-
-
-def process_child_chunks(chunks, parent_id, level=2):
-    """Process child chunks of content."""
-    for i, chunk in enumerate(chunks):
-        chunk_id = f"{parent_id}_chunk_{i}"
-        chunk_title = chunk.get("title", "")
-
-        # Skip chunks with no title
-        if not chunk_title:
-            continue
-
-        # Add chunk node
-        add_content_node(chunk_id, chunk_title, i, level)
-
-        # Connect parent to chunk
-        dot.edge(parent_id, chunk_id, label="sub-section", fontsize="8", style="dotted")
-
-        # Process deeper chunks recursively
-        if "child_chunks" in chunk and chunk["child_chunks"]:
-            process_child_chunks(chunk["child_chunks"], chunk_id, level + 1)
 
 
 # Start processing from root pages
@@ -129,4 +135,3 @@ dot.attr('graph', splines='ortho')  # Use orthogonal splines for cleaner layout
 output_path = Path("confluence_title_hierarchy_diagram")
 dot.render(output_path, view=False, cleanup=True)
 print(f"Diagram saved to: {output_path}.png")
-
