@@ -92,9 +92,16 @@ def header_chunker(html: str, HEADERS_TO_SPLIT_ON) -> list[dict]:
         }
         current_meta[label] = header_text
 
+        # Get all next siblings
+        siblings = list(header.find_next_siblings())
+
+        # Skip this chunk if the first sibling is a header
+        if siblings and isinstance(siblings[0], Tag) and siblings[0].name in header_tags and siblings[0].name != header_text:
+            continue
+
         # Collect content until next header of same or higher level
         content_parts = []
-        for sibling in header.find_next_siblings():
+        for sibling in siblings:
             if isinstance(sibling, Tag) and sibling.name in header_tags:
                 sibling_level = HEADERS_TO_SPLIT_ON.index((sibling.name, header_tags[sibling.name]))
                 if sibling_level <= current_level:
