@@ -83,19 +83,20 @@ def extract_attachments_by_name(client, page_id, attachment_names):
 
 def clean_header_tags(html: str) -> str:
     soup = BeautifulSoup(html, "lxml")
+
     for tag_name in ["h1", "h2", "h3", "h4"]:
         for tag in soup.find_all(tag_name):
-            # Remove <br> tags from header contents
             for br in tag.find_all("br"):
                 br.extract()
 
-            # Get cleaned text
             cleaned_text = tag.get_text(strip=True)
 
-            # Skip header if text is empty
             if not cleaned_text:
-                tag.decompose()  # Completely remove the tag
+                if tag.find("ac:image") or tag.find("img") or tag.find("ri:attachment"):
+                    tag.name = "p"
+                else:
+                    tag.decompose()
             else:
-                tag.string = cleaned_text  # Replace content with cleaned text
+                tag.string = cleaned_text
 
     return str(soup)
