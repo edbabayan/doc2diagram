@@ -1,27 +1,39 @@
 import os
 import json
 from dotenv import load_dotenv
-
+from loguru import logger
 from atlassian import Confluence
 
 from src.config import CFG
 from src.chunker import header_chunker
-from src.utils import (extract_attached_filenames, extract_attachments_by_name, clean_header_tags)
-
-
-# Load the environment variables
-load_dotenv(dotenv_path=CFG.root.joinpath(".env"))
-
-# Initialize the ConfluenceLoader with the environment variables
-confluence = Confluence(
-    url=os.environ["CONFLUENCE_URL"],
-    username=os.environ["CONFLUENCE_USERNAME"],
-    password=os.environ["CONFLUENCE_API_KEY"],
+from src.utils import (
+    extract_attached_filenames,
+    extract_attachments_by_name,
+    clean_header_tags,
 )
 
-def search_pages(space: str = None, title: str = None, label: str = None, limit: int = None):
-    query_parts = ['type = "page"']  # Always include this to exclude images, attachments, etc.
 
+# Load environment variables
+dotenv_path = CFG.root / ".env"
+load_dotenv(dotenv_path=dotenv_path)
+logger.info(f"Loaded environment variables from {dotenv_path}")
+
+# Initialize Confluence client
+try:
+    confluence = Confluence(
+        url=os.environ["CONFLUENCE_URL"],
+        username=os.environ["CONFLUENCE_USERNAME"],
+        password=os.environ["CONFLUENCE_API_KEY"],
+    )
+    logger.success("Confluence client initialized successfully.")
+except Exception as e:
+    logger.error(f"Failed to initialize Confluence client: {e}")
+    raise
+
+
+def search_pages(space=None, title=None, label=None, limit=None):
+    """Search for Confluence pages using CQL query parameters."""
+    query_parts = ['type = "page"']
     if title:
         query_parts.append(f'title ~ "{title}"')
     if space:
@@ -29,70 +41,92 @@ def search_pages(space: str = None, title: str = None, label: str = None, limit:
     if label:
         query_parts.append(f'label = "{label}"')
 
-    cql_query = " AND ".join(query_parts) if query_parts else "type = page"
+    cql_query = " AND ".join(query_parts)
+    logger.debug(f"Executing CQL search: {cql_query}")
 
-    return confluence.cql(cql=cql_query, limit=limit)
+    try:
+        return confluence.cql(cql=cql_query, limit=limit)
+    except Exception as e:
+        logger.error(f"CQL search failed: {e}")
+        raise
 
 
-def get_desc_page_contents(pages, include_children: bool = True):
-    def fetch_page_recursive(page_id):
-        full_page = confluence.get_page_by_id(page_id, expand="body.storage")
-        title = full_page["title"]
-        html_content = full_page["body"]["storage"]["value"]
+def fetch_page_with_children(page_id, include_children=True):
+    """Fetch page content and recursively fetch children if required."""
+    try:
+        page = confluence.get_page_by_id(page_id, expand="body.storage")
+    except Exception as e:
+        logger.error(f"Error fetching page ID {page_id}: {e}")
+        return {}
 
-        # Extract images and attachments
-        attach_filenames = extract_attached_filenames(html_content)
+    title = page["title"]
+    html = page["body"]["storage"]["value"]
 
-        # Extract attachments by their names
-        attachments = extract_attachments_by_name(confluence, page_id, attach_filenames)
+    filenames = extract_attached_filenames(html)
+    attachments = extract_attachments_by_name(confluence, page_id, filenames)
 
-        # Replace attachment references in the HTML content with their URLs
-        for filename, url in zip(attach_filenames, attachments):
-            html_content = html_content.replace(filename, url)
+    for name, url in zip(filenames, attachments):
+        html = html.replace(name, url)
 
-        cleaned_html = clean_header_tags(html_content)
+    cleaned_html = clean_header_tags(html)
+    chunks = header_chunker(cleaned_html, CFG.HEADERS_TO_SPLIT_ON)
 
-        # chunks = hierarchical_title_chunking(markdown_content)
-        chunks = header_chunker(cleaned_html, CFG.HEADERS_TO_SPLIT_ON)
+    logger.debug(f"Fetched page '{title}' (ID: {page_id}), children: {include_children}")
 
-        page_data = {
-            "id": page_id,
-            "title": title,
-            "content": chunks,
-            "child_pages": [],
-        }
+    result = {
+        "id": page_id,
+        "title": title,
+        "content": chunks,
+        "child_pages": [],
+    }
 
-        if include_children:
-            child_pages = confluence.get_child_pages(page_id)
-            for child in child_pages:
-                child_data = fetch_page_recursive(child["id"])
-                page_data["child_pages"].append(child_data)
+    if include_children:
+        try:
+            children = confluence.get_child_pages(page_id)
+            result["child_pages"] = [
+                fetch_page_with_children(child["id"], include_children)
+                for child in children
+            ]
+        except Exception as e:
+            logger.warning(f"Failed to fetch children for page {page_id}: {e}")
 
-        return page_data
+    return result
 
-    contents = []
 
-    for page in pages.get("results", []):
-        page_id = page["content"]["id"]
-        page_data = fetch_page_recursive(page_id)
-        contents.append(page_data)
-
-    return contents
+def get_page_tree(pages_response, include_children=True):
+    """Process a list of page search results into full tree structure."""
+    logger.info("Building page tree from search results...")
+    return [
+        fetch_page_with_children(page["content"]["id"], include_children)
+        for page in pages_response.get("results", [])
+    ]
 
 
 def print_page_tree(pages, indent=0):
+    """Print page titles as a tree structure."""
     for page in pages:
-        print("    " * indent + f"- {page['title']} (ID: {page['id']})")
+        logger.info("    " * indent + f"- {page['title']} (ID: {page['id']})")
         if page["child_pages"]:
             print_page_tree(page["child_pages"], indent + 1)
 
 
-if __name__ == '__main__':
-    results = search_pages(space="EPMRPP", title="UX / UI")
-    pages_with_content = get_desc_page_contents(results)
-    print_page_tree(pages_with_content)
+def save_tree_to_json(tree_data, output_file):
+    """Save the tree structure to a JSON file."""
+    try:
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(tree_data, f, ensure_ascii=False, indent=2)
+        logger.success(f"Page tree saved to {output_file}")
+    except Exception as e:
+        logger.error(f"Failed to save JSON: {e}")
 
-    # Save to JSON
-    output_path = CFG.root / "confluence_page_tree.json"
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(pages_with_content, f, ensure_ascii=False, indent=2)
+
+if __name__ == "__main__":
+    logger.info("Starting Confluence page extraction...")
+
+    try:
+        results = search_pages(space="EPMRPP", title="UX / UI")
+        tree = get_page_tree(results)
+        print_page_tree(tree)
+        save_tree_to_json(tree, CFG.root / "confluence_page_tree.json")
+    except Exception as e:
+        logger.critical(f"Execution failed: {e}")
