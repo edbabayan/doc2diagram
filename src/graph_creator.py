@@ -1,16 +1,12 @@
 import json
-from pathlib import Path
 from graphviz import Digraph
 from collections import defaultdict
 
-# Set the root directory to the parent of the current file's directory
-root = Path(__file__).parent.parent
+from src.config import CFG
 
-# Define the path to your JSON file
-json_path = root / "confluence_page_tree.json"
 
 # Read the JSON data
-with open(json_path, "r") as file:
+with open(CFG.tree_file_path, "r") as file:
     data = json.load(file)
 
 # Initialize Graphviz Digraph
@@ -132,6 +128,5 @@ for page in data:
 dot.attr('graph', splines='ortho')  # Use orthogonal splines for cleaner layout
 
 # Save and render
-output_path = Path("confluence_title_hierarchy_diagram")
-dot.render(output_path, view=False, cleanup=True)
-print(f"Diagram saved to: {output_path}.png")
+dot.render(CFG.diagram_path, view=False, cleanup=True)
+print(f"Diagram saved to: {CFG.diagram_path}.png")

@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from loguru import logger
 from atlassian import Confluence
 
-from src.config import CFG
 from src.chunker import HTMLChunker
 from src.utils import extract_attached_filenames, extract_attachments_by_name, clean_header_tags
 
@@ -91,10 +90,12 @@ class ConfluencePageTreeBuilder:
 
 
 if __name__ == "__main__":
+    from src.config import CFG
+
+
     # Load environment variables
-    dotenv_path = CFG.root / ".env"
-    load_dotenv(dotenv_path=dotenv_path)
-    logger.info(f"Loaded environment variables from {dotenv_path}")
+    load_dotenv(dotenv_path=CFG.env_variable_file)
+    logger.info(f"Loaded environment variables from {CFG.env_variable_file}")
 
     try:
         confluence = Confluence(
