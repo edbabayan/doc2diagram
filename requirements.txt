@@ -5,3 +5,4 @@ graphviz==0.20.3
 BeautifulSoup4==4.13.3
 lxml==5.3.2
 langchain==0.3.23
+loguru==0.7.3
