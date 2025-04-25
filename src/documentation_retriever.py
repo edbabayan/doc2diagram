@@ -1,16 +1,13 @@
 import os
 import json
 from dotenv import load_dotenv
+
 from loguru import logger
 from atlassian import Confluence
 
 from src.config import CFG
 from src.chunker import HTMLChunker
-from src.utils import (
-    extract_attached_filenames,
-    extract_attachments_by_name,
-    clean_header_tags,
-)
+from src.utils import extract_attached_filenames, extract_attachments_by_name, clean_header_tags
 
 
 class ConfluencePageTreeBuilder:
@@ -84,13 +81,6 @@ class ConfluencePageTreeBuilder:
         ]
 
     @staticmethod
-    def print_page_tree(pages, indent=0):
-        for page in pages:
-            logger.info("    " * indent + f"- {page['title']} (ID: {page['id']})")
-            if page["child_pages"]:
-                ConfluencePageTreeBuilder.print_page_tree(page["child_pages"], indent + 1)
-
-    @staticmethod
     def save_tree_to_json(tree_data, output_file):
         try:
             with open(output_file, "w", encoding="utf-8") as f:
@@ -122,7 +112,6 @@ if __name__ == "__main__":
     try:
         results = builder.search_pages(space="EPMRPP", title="UX / UI")
         tree = builder.get_page_tree(results)
-        builder.print_page_tree(tree)
         builder.save_tree_to_json(tree, CFG.root / "confluence_page_tree.json")
     except Exception as run_error:
         logger.critical(f"Execution failed: {run_error}")
