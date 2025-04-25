@@ -1,3 +1,4 @@
+from loguru import logger
 from bs4 import BeautifulSoup, Tag
 from typing import List, Dict, Tuple
 
@@ -90,6 +91,8 @@ class HTMLChunker:
             content = self._collect_chunk_content(header, current_level)
             if not content:
                 content = header_text
+
+            logger.info(f"Creating chunk: {header_text}")
 
             chunks.append({
                 "metadata": current_meta.copy(),
