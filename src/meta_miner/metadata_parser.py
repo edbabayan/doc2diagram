@@ -1,52 +1,63 @@
 import os
 import json
 from typing import Any
-from dataclasses import dataclass
 
 from dotenv import load_dotenv
+from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
-
-from src.config import CFG
 from langgraph.graph import StateGraph, START, END
 
-
-load_dotenv(dotenv_path=CFG.env_variable_file)
-
-api_key = os.getenv("OPENAI_API_KEY")
-llm = ChatOpenAI(model="gpt-4o-mini")
+from src.config import CFG
+from src.meta_miner.config import MetaConfig, StructuredMetadata
+from src.meta_miner.statement import PageState,Output
 
 
-# Read the JSON data
-with open(CFG.tree_file_path, "r") as file:
-    data = json.load(file)
+class MetadataExtractor:
+    def __init__(self):
+        self.llm = ChatOpenAI(model=MetaConfig.model).bind_tools([StructuredMetadata])
+        self.graph = self._build_graph()
 
-page_content = data[0]['child_pages'][-2]
+    def _build_graph(self) -> StateGraph:
+        builder = StateGraph(input=PageState, output=Output)
+        builder.add_node("extract_metadata", self._extract_metadata_node)
+        builder.add_edge(START, "extract_metadata")
+        builder.add_edge("extract_metadata", END)
+        return builder.compile()
+
+    def _extract_metadata_node(self, page_state: PageState) -> Output:
+        extracted_objects = []
+
+        for chunk in page_state.content:
+            content_text = chunk["page_content"]
+            result = self.llm.invoke(
+                [MetaConfig.system_message, HumanMessage(content_text)]
+            )
+            structured_object = StructuredMetadata.model_validate(result.tool_calls[0]["args"])
+            print(structured_object)  # Or collect them
+            extracted_objects.append(structured_object)
+
+        return Output()  # Adjust if Output should carry data
+
+    def extract(self, page: list[dict[str, Any]]) -> Output:
+        """Public method to extract metadata from given PageState."""
+
+        page_state = PageState(content=page['content'])
+
+        return self.graph.invoke(page_state)
 
 
-@dataclass
-class PageState:
-    title: str
-    content: list[dict[str, Any]]
+if __name__ == '__main__':
+
+    load_dotenv(dotenv_path=CFG.env_variable_file)
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    llm = ChatOpenAI(model=MetaConfig.model)
 
 
-@dataclass
-class Output:
-    title: str
+    # Read the JSON data
+    with open(CFG.tree_file_path, "r") as file:
+        data = json.load(file)
 
+    extractor = MetadataExtractor()
 
-def extract_title(page_content: PageState) -> Output:
-    title = page_content.title
-    # You can process content if necessary
-    return Output(title=title)
-
-
-builder = StateGraph(input=PageState, output=Output)  # Specify both input and output types
-builder.add_node(extract_title, "extract_title")
-
-builder.add_edge(START, "extract_title")
-builder.add_edge("extract_title", END)
-
-graph = builder.compile()
-
-# Pass the entire PageState object as input
-print(graph.invoke(PageState(title=page_content['title'], content=page_content['content'])))
+    extractor.extract(data)
