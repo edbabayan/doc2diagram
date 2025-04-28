@@ -69,7 +69,7 @@ class HTMLChunker:
             html (str): Raw HTML content to be chunked.
 
         Returns:
-            List[Dict[str, str]]: Chunks with 'metadata' and 'page_content'.
+            List[Dict[str, str]]: Chunks with 'hierarchy' and 'page_content'.
         """
         soup = BeautifulSoup(html, "lxml", from_encoding="utf-8")
         self._clean_headers(soup)
@@ -95,7 +95,7 @@ class HTMLChunker:
             logger.info(f"Creating chunk: {header_text}")
 
             chunks.append({
-                "metadata": current_meta.copy(),
+                "hierarchy": current_meta.copy(),
                 "page_content": content
             })
 
