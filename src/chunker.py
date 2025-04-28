@@ -26,9 +26,9 @@ class HTMLChunker:
                     br.extract()
                 tag.string = tag.get_text(strip=True)
 
-    def _update_metadata(self, current_meta: Dict[str, str], label: str, header_text: str) -> Dict[str, str]:
+    def _update_hierarchy(self, current_meta: Dict[str, str], label: str, header_text: str) -> Dict[str, str]:
         """
-        Updates metadata for the current level, pruning deeper levels.
+        Updates hierarchy for the current level, pruning deeper levels.
         """
         current_level = self.splitting_headers.index((self.label_to_tag[label], label))
         new_meta = {
@@ -87,7 +87,7 @@ class HTMLChunker:
             if not header_text:
                 continue
 
-            current_meta = self._update_metadata(current_meta, label, header_text)
+            current_meta = self._update_hierarchy(current_meta, label, header_text)
             content = self._collect_chunk_content(header, current_level)
             if not content:
                 content = header_text
@@ -96,7 +96,7 @@ class HTMLChunker:
 
             chunks.append({
                 "hierarchy": current_meta.copy(),
-                "page_content": content
+                "page_content": content,
             })
 
         return chunks
