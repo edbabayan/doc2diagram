@@ -1,8 +1,8 @@
 import os
 import json
-from dotenv import load_dotenv
 
 from loguru import logger
+from dotenv import load_dotenv
 from atlassian import Confluence
 
 from src.chunker import HTMLChunker
