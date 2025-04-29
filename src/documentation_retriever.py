@@ -13,7 +13,7 @@ from src.utils import extract_attached_filenames, extract_attachments_by_name, c
 class ConfluencePageTreeBuilder:
     def __init__(self, confluence_client: Confluence, splitting_headers: list[tuple[str, str]]):
         self.confluence = confluence_client
-        self.extractor = MetadataExtractor()
+        self.extractor = MetadataExtractor(use_cache=True)
         self.chunker = HTMLChunker(splitting_headers)
 
     def search_pages(self, space=None, title=None, label=None, limit=None):
