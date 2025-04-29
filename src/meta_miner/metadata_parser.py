@@ -2,12 +2,12 @@ import os
 import json
 from typing import Any
 
+from tqdm import tqdm
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
 
-from src.config import CFG
 from src.meta_miner.config import MetaConfig, StructuredMetadata
 from src.meta_miner.statement import PageState,Output
 
@@ -33,20 +33,27 @@ class MetadataExtractor:
                 [MetaConfig.system_message, HumanMessage(content_text)]
             )
             structured_object = StructuredMetadata.model_validate(result.tool_calls[0]["args"])
-            print(structured_object)  # Or collect them
-            extracted_objects.append(structured_object)
+            chunk["metadata"] = structured_object.key_topics
+            chunk["content_type"] = structured_object.content_type
 
-        return Output()  # Adjust if Output should carry data
+        return Output(
+            id=page_state.id,
+            title=page_state.title,
+            content=page_state.content,
+        )
 
     def extract(self, page: list[dict[str, Any]]) -> Output:
         """Public method to extract metadata from given PageState."""
 
-        page_state = PageState(content=page['content'])
+        page_state = PageState(id=page['id'],
+                               title=page['title'],
+                               content=page['content'])
 
         return self.graph.invoke(page_state)
 
 
 if __name__ == '__main__':
+    from src.config import CFG
 
     load_dotenv(dotenv_path=CFG.env_variable_file)
 
@@ -60,4 +67,6 @@ if __name__ == '__main__':
 
     extractor = MetadataExtractor()
 
-    extractor.extract(data)
+    page = data[0]['child_pages'][0]
+
+    extractor.extract(page)
