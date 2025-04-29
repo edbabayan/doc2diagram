@@ -27,7 +27,7 @@ class MetadataExtractor:
     def _extract_metadata_node(self, page_state: PageState) -> Output:
         extracted_objects = []
 
-        for chunk in page_state.content:
+        for chunk in tqdm(page_state.content, desc=f"Processing {page_state.title} chunks", unit="chunk"):
             content_text = chunk["page_content"]
             result = self.llm.invoke(
                 [MetaConfig.system_message, HumanMessage(content_text)]
