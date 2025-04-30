@@ -1,132 +1,77 @@
 import json
 from graphviz import Digraph
 from collections import defaultdict
-
 from src.config import CFG
 
-
-# Read the JSON data
+# Load the JSON data
 with open(CFG.tree_file_path, "r") as file:
     data = json.load(file)
 
 # Initialize Graphviz Digraph
-dot = Digraph(comment="Confluence Page Tree with Content Titles", format='png')
-dot.attr(rankdir='TB')  # Top to bottom layout
-dot.attr(dpi='300')  # Set higher resolution
-dot.graph_attr['nodesep'] = '0.5'
-dot.graph_attr['ranksep'] = '0.7'
+dot = Digraph(comment="Confluence Page Tree", format='png')
+dot.attr(rankdir='TB', dpi='300', nodesep='0.5', ranksep='0.7', splines='ortho')
 
-# Define colors for different levels
+# Node level colors
 level_colors = {
-    0: '#4285F4',  # Blue for pages
-    1: '#34A853',  # Green for content sections/subsections
-    2: '#FBBC05',  # Yellow for topics
-    3: '#EA4335'  # Red for deeper content
+    0: '#4285F4',  # Root page
+    1: '#34A853',  # Subsection
+    2: '#FBBC05',  # Topic
+    3: '#EA4335',  # Deep level content
 }
 
-
 def truncate_text(text, max_length=30):
-    """Truncate text for display in nodes."""
-    if not text:
-        return "Untitled"
-    return (text[:max_length] + '...') if len(text) > max_length else text
+    return (text[:max_length] + '...') if text and len(text) > max_length else (text or "Untitled")
 
-
-def add_page_node(node_id, title, level=0):
-    """Add a page node with specific styling."""
-    color = level_colors[min(level, 3)]
+def add_node(node_id, label, level, shape='box', tooltip=""):
+    color = level_colors.get(min(level, 3), "#999999")
     dot.node(node_id,
-             label=truncate_text(title),
-             shape='box',
-             style='filled,rounded',
+             label=truncate_text(label),
+             shape=shape,
+             style='filled,rounded' if shape == 'box' else 'filled',
              fillcolor=color,
              fontcolor='white',
-             tooltip=title)
-
-
-def add_content_node(node_id, title, level=1, tooltip=""):
-    """Add a content node with specific styling."""
-    color = level_colors[min(level, 3)]
-    label = truncate_text(title)
-
-    if not title:
-        label = "Untitled Content"
-
-    dot.node(node_id,
-             label=label,
-             shape='note',
-             style='filled',
-             fillcolor=color,
-             fontcolor='white',
-             tooltip=tooltip)
-
+             tooltip=label or tooltip)
 
 def process_page(page, parent_id=None, level=0):
-    """Process a page and its subsections/topics."""
     page_id = str(page["id"])
-    title = page["title"]
+    title = page.get("title", "Untitled")
+    add_node(page_id, title, level=0)
 
-    # Add the page node
-    add_page_node(page_id, title, level)
-
-    # Connect to parent if exists
     if parent_id:
         dot.edge(parent_id, page_id, label="child page", fontsize="10")
 
-    # Process content with hierarchy if any
+    # Organize content into subsections and topics
     if "content" in page and page["content"]:
-        # Group content by subsection
-        subsections = defaultdict(list)
-        for content_item in page["content"]:
-            metadata = content_item.get("metadata", {})
-            subsection = metadata.get("Subsection", "")
-            topic = metadata.get("Topic", "")
+        subsections = defaultdict(lambda: defaultdict(list))  # {Subsection: {Topic: [content]}}
 
-            # Add content item to its subsection group
-            subsections[subsection].append((topic, content_item))
+        for item in page["content"]:
+            hierarchy = item.get("hierarchy", {})
+            subsection = hierarchy.get("Subsection") or hierarchy.get("Section", "")
+            topic = hierarchy.get("Topic", "")
+            subsections[subsection][topic].append(item)
 
-        # Process each subsection and its topics
-        for i, (subsection_name, topics_list) in enumerate(subsections.items()):
-            if not subsection_name:  # Skip items without subsection
+        for i, (subsection_name, topics) in enumerate(subsections.items()):
+            if not subsection_name:
                 continue
-
-            # Create subsection node
-            subsection_id = f"{page_id}_subsection_{i}"
-            add_content_node(subsection_id, subsection_name, level=1, tooltip=f"Subsection: {subsection_name}")
-
-            # Connect page to subsection
+            subsection_id = f"{page_id}_sub_{i}"
+            add_node(subsection_id, subsection_name, level=1, shape='note', tooltip=f"Subsection: {subsection_name}")
             dot.edge(page_id, subsection_id, label="contains", fontsize="10", style="dashed")
 
-            # Process topics under this subsection
-            topic_dict = defaultdict(list)
-            for topic_name, content_item in topics_list:
-                topic_dict[topic_name].append(content_item)
-
-            # Create topic nodes under the subsection
-            for j, (topic_name, content_items) in enumerate(topic_dict.items()):
-                if not topic_name:  # Skip items without topic
+            for j, (topic_name, content_items) in enumerate(topics.items()):
+                if not topic_name:
                     continue
-
-                # Create topic node
                 topic_id = f"{subsection_id}_topic_{j}"
-                add_content_node(topic_id, topic_name, level=2, tooltip=f"Topic: {topic_name}")
-
-                # Connect subsection to topic
+                add_node(topic_id, topic_name, level=2, shape='note', tooltip=f"Topic: {topic_name}")
                 dot.edge(subsection_id, topic_id, label="contains", fontsize="10", style="dotted")
 
-    # Process child pages recursively
-    if "child_pages" in page and page["child_pages"]:
-        for child_page in page["child_pages"]:
-            process_page(child_page, page_id, level)
+    # Recurse into child pages
+    for child in page.get("child_pages", []):
+        process_page(child, parent_id=page_id, level=level+1)
 
-
-# Start processing from root pages
+# Render each root page
 for page in data:
     process_page(page)
 
-# Use a hierarchical layout
-dot.attr('graph', splines='ortho')  # Use orthogonal splines for cleaner layout
-
-# Save and render
+# Save diagram
 dot.render(CFG.diagram_path, view=False, cleanup=True)
 print(f"Diagram saved to: {CFG.diagram_path}.png")

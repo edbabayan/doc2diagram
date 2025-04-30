@@ -1,17 +1,19 @@
 import os
 import json
-from dotenv import load_dotenv
 
 from loguru import logger
+from dotenv import load_dotenv
 from atlassian import Confluence
 
 from src.chunker import HTMLChunker
+from src.meta_miner.metadata_parser import MetadataExtractor
 from src.utils import extract_attached_filenames, extract_attachments_by_name, clean_header_tags
 
 
 class ConfluencePageTreeBuilder:
     def __init__(self, confluence_client: Confluence, splitting_headers: list[tuple[str, str]]):
         self.confluence = confluence_client
+        self.extractor = MetadataExtractor(use_cache=True)
         self.chunker = HTMLChunker(splitting_headers)
 
     def search_pages(self, space=None, title=None, label=None, limit=None):
@@ -53,10 +55,14 @@ class ConfluencePageTreeBuilder:
 
         logger.debug(f"Fetched page '{title}' (ID: {page_id}), children: {include_children}")
 
+        meta_result = self.extractor.extract({'id': page_id,
+                                         "title": title,
+                                         "content": chunks})
+
         result = {
             "id": page_id,
             "title": title,
-            "content": chunks,
+            "content": meta_result["content"],
             "child_pages": [],
         }
 
