@@ -18,3 +18,5 @@ class CFG:
         ("h3", "Topic"),
         ("h4", "Sub‑topic"),
     ]
+
+    local_llm_model = 'qwen3:8b'
