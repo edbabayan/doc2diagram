@@ -6,14 +6,12 @@ from dotenv import load_dotenv
 from atlassian import Confluence
 
 from src.chunker import HTMLChunker
-from src.meta_miner.metadata_parser import MetadataExtractor
 from src.utils import extract_attached_filenames, extract_attachments_by_name, clean_header_tags
 
 
 class ConfluencePageTreeBuilder:
     def __init__(self, confluence_client: Confluence, splitting_headers: list[tuple[str, str]]):
         self.confluence = confluence_client
-        self.extractor = MetadataExtractor(use_cache=True)
         self.chunker = HTMLChunker(splitting_headers)
 
     def search_pages(self, space=None, title=None, label=None, limit=None):
@@ -34,7 +32,7 @@ class ConfluencePageTreeBuilder:
             logger.error(f"CQL search failed: {query_error}")
             raise
 
-    def fetch_page_with_children(self, page_id, include_children=True):
+    def fetch_page_with_children(self, page_id, include_children=True, project_name=None):
         try:
             page = self.confluence.get_page_by_id(page_id, expand="body.storage")
         except Exception as fetch_error:
@@ -55,16 +53,16 @@ class ConfluencePageTreeBuilder:
 
         logger.debug(f"Fetched page '{title}' (ID: {page_id}), children: {include_children}")
 
-        meta_result = self.extractor.extract({'id': page_id,
-                                         "title": title,
-                                         "content": chunks})
-
         result = {
             "id": page_id,
             "title": title,
-            "content": meta_result["content"],
+            "content":chunks,
             "child_pages": [],
         }
+
+        # Add project_name if provided
+        if project_name:
+            result["project_name"] = project_name
 
         if include_children:
             try:
@@ -78,11 +76,12 @@ class ConfluencePageTreeBuilder:
 
         return result
 
-    def get_page_tree(self, pages_response, include_children=True):
+    def get_page_tree(self, pages_response, include_children=True, project_name=None):
         logger.info("Building page tree from search results...")
         return [
-            self.fetch_page_with_children(page["content"]["id"], include_children)
-            for page in pages_response.get("results", [])
+            self.fetch_page_with_children(page["content"]["id"], include_children,
+                                          project_name if i == 0 else None)  # Only add project_name to first page
+            for i, page in enumerate(pages_response.get("results", []))
         ]
 
     @staticmethod
@@ -97,7 +96,6 @@ class ConfluencePageTreeBuilder:
 
 if __name__ == "__main__":
     from src.config import CFG
-
 
     # Load environment variables
     load_dotenv(dotenv_path=CFG.env_variable_file)
@@ -117,8 +115,11 @@ if __name__ == "__main__":
     builder = ConfluencePageTreeBuilder(confluence, CFG.HEADERS_TO_SPLIT_ON)
 
     try:
-        results = builder.search_pages(space="EPMRPP", title="UX / UI")
-        tree = builder.get_page_tree(results)
+
+        _project_name = "EPMRPP"
+
+        results = builder.search_pages(space=_project_name, title="UX / UI")
+        tree = builder.get_page_tree(results, project_name=_project_name)
         builder.save_tree_to_json(tree, CFG.root / "confluence_page_tree.json")
     except Exception as run_error:
         logger.critical(f"Execution failed: {run_error}")
