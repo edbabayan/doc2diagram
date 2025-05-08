@@ -56,11 +56,11 @@ class ConfluencePageTreeBuilder:
         result = {
             "id": page_id,
             "title": title,
-            "content":chunks,
+            "content": chunks,
             "child_pages": [],
         }
 
-        # Add project_name if provided
+        # Add project_name to all pages if provided
         if project_name:
             result["project_name"] = project_name
 
@@ -68,7 +68,7 @@ class ConfluencePageTreeBuilder:
             try:
                 children = self.confluence.get_child_pages(page_id)
                 result["child_pages"] = [
-                    self.fetch_page_with_children(child["id"], include_children)
+                    self.fetch_page_with_children(child["id"], include_children, project_name)
                     for child in children
                 ]
             except Exception as child_error:
@@ -79,8 +79,7 @@ class ConfluencePageTreeBuilder:
     def get_page_tree(self, pages_response, include_children=True, project_name=None):
         logger.info("Building page tree from search results...")
         return [
-            self.fetch_page_with_children(page["content"]["id"], include_children,
-                                          project_name if i == 0 else None)  # Only add project_name to first page
+            self.fetch_page_with_children(page["content"]["id"], include_children, project_name)
             for i, page in enumerate(pages_response.get("results", []))
         ]
 
@@ -115,7 +114,6 @@ if __name__ == "__main__":
     builder = ConfluencePageTreeBuilder(confluence, CFG.HEADERS_TO_SPLIT_ON)
 
     try:
-
         _project_name = "EPMRPP"
 
         results = builder.search_pages(space=_project_name, title="UX / UI")
