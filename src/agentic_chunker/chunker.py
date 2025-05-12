@@ -1,20 +1,12 @@
 from pydantic import BaseModel, Field
 from typing import List
+from loguru import logger
 
 from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from src.config import CFG
 from src.agentic_chunker.prompts import AgentPrompts
-
-test_chunk = {'hierarchy': {'Subsection': 'About ReportPortal', 'Topic': 'Our brand story'},
-              'page_content': "At ReportPortal, we are committed to delivering cutting-edge solutions that empower teams and organizations to achieve excellence in test automation and reporting. Our platform stands at the intersection of innovation and efficiency, providingreal-time analytics and insights into automated test results.\nOur mission\nОur mission is clear and resolute: to empower quality assurance excellence in the ever-evolving landscape of software development. We are dedicated to equipping QA professionals, testers, and development teams with the tools, knowledge,and resources they need to deliver exceptional software products.\nOur core values\n• Innovation:We're dedicated to pioneering new approaches and technologies that enhance testing efficiencyand effectiveness.\n• Collaboration:We foster a spirit of collaboration, recognizing that achieving QA excellence requires collective effort.\n• Empowerment:We empower testers and QA professionals by offering intuitive, user-friendly tools and resources.\n• Transparency:We provide clear documentation, guidelines, and support to ensure that you have a full understandingof how to maximize the potential of our platform.\n• Community:Our mission extends beyond our platform, as we actively engage with this community to share knowledgeand best practices.",
-              'metadata': ['test automation',
-                           'reporting',
-                           'real-time analytics',
-                           'quality assurance',
-                           'community engagement'],
-              'content_type': 'promotional'}
 
 
 # Define the Chunk model
@@ -37,6 +29,9 @@ class Chunk(BaseModel):
     project_name: str = Field(
         description="The name of the project."
     )
+    attachments: list = Field(
+        description="A list of attachments associated with the chunk, such as images or documents."
+    )
 
 
 # Define a new model for multiple chunks
@@ -47,10 +42,17 @@ class ChunkList(BaseModel):
 
 
 # Initialize the language model with streaming enabled
-qwen3 = ChatOllama(
-    model=CFG.local_llm_model,
-    temperature=0.0,
-)
+logger.info(f"Initializing language model: {CFG.local_llm_model}")
+try:
+    qwen3 = ChatOllama(
+        model=CFG.local_llm_model,
+        temperature=0.0,
+    )
+    logger.success(f"Successfully initialized {CFG.local_llm_model}")
+except Exception as e:
+    logger.error(f"Failed to initialize language model: {str(e)}")
+    logger.exception("Detailed exception information:")
+    raise
 
 
 def chunk_page(text, hierarchy, project_name):
@@ -64,6 +66,9 @@ def chunk_page(text, hierarchy, project_name):
     Returns:
         list: A list of Chunk objects.
     """
+    logger.info(f"Chunking page with hierarchy: {hierarchy}")
+    logger.debug(f"Text length: {len(text)} characters, Project: {project_name}")
+
     system_message = SystemMessage(content=AgentPrompts.chunker_prompt)
     user_message = HumanMessage(
         content=f"Split the following text into appropriate chunks: {text} with hierarchy: {hierarchy} and {project_name}"
@@ -72,28 +77,46 @@ def chunk_page(text, hierarchy, project_name):
     )
 
     # Bind the ChunkList tool instead of the single Chunk
+    logger.debug("Binding ChunkList tool to language model")
     structured_qwen3 = qwen3.bind_tools([ChunkList])
 
-    response = structured_qwen3.invoke([system_message, user_message])
+    try:
+        logger.info("Invoking language model to chunk text")
+        response = structured_qwen3.invoke([system_message, user_message])
 
-    # Parse the response to get the list of chunks
-    chunk_list = ChunkList.model_validate(response.tool_calls[0]["args"])
+        # Parse the response to get the list of chunks
+        chunk_list = ChunkList.model_validate(response.tool_calls[0]["args"])
 
-    # Return just the list of chunks
-    return chunk_list.chunks
+        logger.success(f"Successfully chunked text into {len(chunk_list.chunks)} chunks")
+
+        # Return just the list of chunks
+        return chunk_list.chunks
+
+    except Exception as e:
+        logger.error(f"Error during chunking: {str(e)}")
+        logger.exception("Detailed exception information:")
+        # Return an empty list if chunking fails
+        return []
 
 
 if __name__ == '__main__':
+    logger.info("Running chunker test")
+
+    test_chunk = {'hierarchy': {'Subsection': 'About ReportPortal', 'Topic': 'Our brand story'},
+                  'page_content': "At ReportPortal, we are committed to delivering cutting-edge solutions that empower teams and organizations to achieve excellence in test automation and reporting. Our platform stands at the intersection of innovation and efficiency, providingreal-time analytics and insights into automated test results.\nOur mission\nОur mission is clear and resolute: to empower quality assurance excellence in the ever-evolving landscape of software development. We are dedicated to equipping QA professionals, testers, and development teams with the tools, knowledge,and resources they need to deliver exceptional software products.\nOur core values\n• Innovation:We're dedicated to pioneering new approaches and technologies that enhance testing efficiencyand effectiveness.\n• Collaboration:We foster a spirit of collaboration, recognizing that achieving QA excellence requires collective effort.\n• Empowerment:We empower testers and QA professionals by offering intuitive, user-friendly tools and resources.\n• Transparency:We provide clear documentation, guidelines, and support to ensure that you have a full understandingof how to maximize the potential of our platform.\n• Community:Our mission extends beyond our platform, as we actively engage with this community to share knowledgeand best practices.",
+                  'metadata': ['test automation',
+                               'reporting',
+                               'real-time analytics',
+                               'quality assurance',
+                               'community engagement'],
+                  'content_type': 'promotional'}
+
     # Example usage
     hierarchy_test = test_chunk['hierarchy']
     text_test = test_chunk['page_content']
+    project_name_test = "ReportPortal"
+
+    logger.info("Starting test chunking")
 
     # This will now return a list of Chunk objects
-    chunked_text = chunk_page(text_test, hierarchy_test)
-
-    # You can iterate through the chunks
-    for i, chunk in enumerate(chunked_text):
-        print(f"Chunk {i + 1}:")
-        print(f"Text: {chunk.text[:50]}...")
-        print(f"Summary: {chunk.summary}")
-        print("---")
+    chunked_text = chunk_page(text_test, hierarchy_test, project_name_test)
