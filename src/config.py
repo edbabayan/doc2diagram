@@ -19,4 +19,6 @@ class CFG:
         ("h4", "Sub‑topic"),
     ]
 
+    opeanai_embed_dim = 3072
+
     local_llm_model = 'qwen3:8b'

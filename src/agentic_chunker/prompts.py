@@ -37,8 +37,9 @@ class AgentPrompts:
         8. **Self-Contained Chunks:**
            - **Complete Ideas:** Each chunk should be self-contained, including all necessary context for understanding.
            - **Summaries and Explanations:** Add brief summaries or explanations if needed to clarify the content within the chunk.
-
-        **Important Note:**
+        9. **Project name**
+           - Don't change the project name, it should be the same as the one in the document.
+           
         - **Chunk Only the Current Page:** Create chunks exclusively from the **Current Page Content** provided.
         - **Use Context Appropriately:** Utilize the **Previous Page Content** and **Next Page Content** solely for understanding context, but do not include their text in the chunks.
         """

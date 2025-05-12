@@ -34,6 +34,9 @@ class Chunk(BaseModel):
     summary: str = Field(
         description="A summary of the chunk, highlighting its main points and themes."
     )
+    project_name: str = Field(
+        description="The name of the project."
+    )
 
 
 # Define a new model for multiple chunks
@@ -50,19 +53,21 @@ qwen3 = ChatOllama(
 )
 
 
-def chunk_text(text, hierarchy):
+def chunk_page(text, hierarchy, project_name):
     """
     Splits the text into chunks of a specified size.
 
     Args:
         text (str): The text to be split.
         hierarchy (dict): The hierarchy of the chunks.
+        project_name (str): The name of the project.
     Returns:
         list: A list of Chunk objects.
     """
     system_message = SystemMessage(content=AgentPrompts.chunker_prompt)
     user_message = HumanMessage(
-        content=f"Split the following text into appropriate chunks: {text} with hierarchy: {hierarchy}. "
+        content=f"Split the following text into appropriate chunks: {text} with hierarchy: {hierarchy} and {project_name}"
+                f"name of the project. "
                 f"Return multiple chunks, with each chunk representing a logical section of the text."
     )
 
@@ -84,7 +89,7 @@ if __name__ == '__main__':
     text_test = test_chunk['page_content']
 
     # This will now return a list of Chunk objects
-    chunked_text = chunk_text(text_test, hierarchy_test)
+    chunked_text = chunk_page(text_test, hierarchy_test)
 
     # You can iterate through the chunks
     for i, chunk in enumerate(chunked_text):

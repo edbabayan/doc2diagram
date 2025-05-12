@@ -1,10 +1,14 @@
 import json
 
 from src.config import CFG
-
+from src.agentic_chunker.chunker import chunk_page
+from src.agentic_chunker.utils import download_local_llm
 
 with open(CFG.tree_file_path, "r", encoding="utf-8") as f:
     data = json.load(f)
+
+
+download_local_llm(CFG.local_llm_model)
 
 
 def process_confluence_tree(tree, process_function, parent_path=""):
@@ -36,7 +40,7 @@ def process_confluence_tree(tree, process_function, parent_path=""):
     content_sections = tree.get("content", [])
     for section in content_sections:
         # You could also process individual content sections if needed
-        # process_function(section, f"{current_path}/content")
+        process_function(section, f"{current_path}/content")
         pass
 
     # Recursively process child pages
@@ -48,6 +52,12 @@ def process_confluence_tree(tree, process_function, parent_path=""):
 # Example usage: Print all page titles with their paths
 def print_page_info(page, path):
     """Example process function that prints page ID and title"""
+    split_text = page.get("content", [])
+    project_name = page.get("project_name", "unknown")
+    for chunk in split_text:
+        chunk_hierarchy = chunk.get("hierarchy", {})
+        chunk_text = chunk.get("page_content", "")
+        chunks_list = chunk_page(chunk_text, chunk_hierarchy, project_name)
 
     print(f"Page: {path} (ID: {page.get('id', 'unknown')})")
 
