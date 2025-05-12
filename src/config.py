@@ -20,5 +20,5 @@ class CFG:
     ]
 
     opeanai_embed_dim = 3072
-
+    embed_model = "text-embedding-3-large"
     local_llm_model = 'qwen3:8b'
