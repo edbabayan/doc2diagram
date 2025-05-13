@@ -145,7 +145,7 @@ class HTMLChunker:
                             url = url
                         else:
                             url = f"ri:attachment:{url}"
-                        attachments.append(f"[Attachment] {url}")
+                        content_parts.append(f"[Attachment] {url}")
 
                 # Check for ac:link attachments
                 for ac_link in sibling.find_all("ac:link"):
@@ -157,11 +157,11 @@ class HTMLChunker:
                             url = url
                         else:
                             url = f"ri:attachment:{url}"
-                        attachments.append(f"[Attachment] {url}")
+                        content_parts.append(f"[Attachment] {url}")
 
             # Also check for standalone attachments
             elif str(sibling).strip().startswith('[Attachment]'):
-                attachments.append(str(sibling).strip())
+                content_parts.append(str(sibling).strip())
 
         # Combine all content
         result = "\n\n".join(filter(None, content_parts))
