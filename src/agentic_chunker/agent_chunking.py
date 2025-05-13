@@ -98,6 +98,8 @@ def split_text(page, path, openai_client):
                     "source": path,
                     "source_page_id": page_id,
                     "attachments": chunk.attachments,
+                    "last_modified": page['last_modified'],
+                    "last_modified_by": page['last_modified_by'],
                 }
 
                 point_id = str(uuid.uuid4())
