@@ -34,7 +34,8 @@ class ConfluencePageTreeBuilder:
 
     def fetch_page_with_children(self, page_id, include_children=True, project_name=None):
         try:
-            page = self.confluence.get_page_by_id(page_id, expand="body.storage")
+            # Get the page content with its history
+            page = self.confluence.get_page_by_id(page_id, expand="body.storage,history,history.lastUpdated")
         except Exception as fetch_error:
             logger.error(f"Error fetching page ID {page_id}: {fetch_error}")
             return {}
@@ -42,11 +43,33 @@ class ConfluencePageTreeBuilder:
         title = page["title"]
         html = page["body"]["storage"]["value"]
 
+        # Extract the last modification date and author
+        last_modified = None
+        last_modified_by = None
+
+        # First try to get the lastUpdated information directly
+        if "history" in page and "lastUpdated" in page["history"]:
+            history_data = page["history"]["lastUpdated"]
+            if "when" in history_data:
+                last_modified = history_data["when"]
+            if "by" in history_data and "displayName" in history_data["by"]:
+                last_modified_by = history_data["by"]["displayName"]
+
+        # If not found, try to fetch history separately
+        if not last_modified:
+            try:
+                history = self.confluence.get_page_by_id(page_id, expand="history.lastUpdated")
+                if "history" in history and "lastUpdated" in history["history"]:
+                    history_data = history["history"]["lastUpdated"]
+                    if "when" in history_data:
+                        last_modified = history_data["when"]
+                    if "by" in history_data and "displayName" in history_data["by"]:
+                        last_modified_by = history_data["by"]["displayName"]
+            except Exception as history_error:
+                logger.warning(f"Failed to fetch history for page {page_id}: {history_error}")
+
         filenames = extract_attached_filenames(html)
         attachments = extract_attachments_by_name(self.confluence, page_id, filenames)
-
-        for name, url in zip(filenames, attachments):
-            html = html.replace(name, url)
 
         cleaned_html = clean_header_tags(html)
         chunks = self.chunker.chunk(cleaned_html)
@@ -57,6 +80,8 @@ class ConfluencePageTreeBuilder:
             "id": page_id,
             "title": title,
             "content": chunks,
+            "last_modified": last_modified,
+            "last_modified_by": last_modified_by,
             "child_pages": [],
         }
 
