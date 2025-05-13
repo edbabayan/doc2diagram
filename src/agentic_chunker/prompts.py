@@ -37,7 +37,7 @@ class AgentPrompts:
 
     7. **Attachment Handling (CRITICAL):**
        - ALL [Attachment] tags MUST be preserved with their complete URLs and descriptions.
-       - Example: "[Attachment] [https://example.com/file.pdf](https://example.com/file.pdf) (PDF)" must appear exactly as shown.
+       - Example: "[https://example.com/file.pdf](https://example.com/file.pdf) (PDF)" must appear exactly as shown.
        - Never shorten, simplify, or remove attachment references.
        - Keep attachment context by including surrounding text in the same chunk.
        - URLs must remain completely unmodified, including all parameters and special characters.
