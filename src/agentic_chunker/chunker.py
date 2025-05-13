@@ -84,13 +84,26 @@ def chunk_page(text, hierarchy, project_name):
         logger.info("Invoking language model to chunk text")
         response = structured_qwen3.invoke([system_message, user_message])
 
-        # Parse the response to get the list of chunks
-        chunk_list = ChunkList.model_validate(response.tool_calls[0]["args"])
+        # Get the raw chunks from the response
+        raw_chunks = response.tool_calls[0]["args"].get("chunks", [])
 
-        logger.success(f"Successfully chunked text into {len(chunk_list.chunks)} chunks")
+        # Create properly formatted chunks with the manual hierarchy and project_name
+        formatted_chunks = []
+        for raw_chunk in raw_chunks:
+            # Create a complete chunk with manually provided hierarchy and project_name
+            chunk = Chunk(
+                text=raw_chunk.get("text", ""),
+                hierarchy=hierarchy,  # Manually set hierarchy
+                keywords=raw_chunk.get("keywords", []),
+                content_type=raw_chunk.get("content_type", "unknown"),
+                summary=raw_chunk.get("summary", ""),
+                project_name=project_name,  # Manually set project_name
+                attachments=raw_chunk.get("attachments", [])
+            )
+            formatted_chunks.append(chunk)
 
         # Return just the list of chunks
-        return chunk_list.chunks
+        return formatted_chunks
 
     except Exception as e:
         logger.error(f"Error during chunking: {str(e)}")
