@@ -5,14 +5,14 @@ from loguru import logger
 from dotenv import load_dotenv
 from atlassian import Confluence
 
-from src.chunker import HTMLChunker
+from src.html_parser import HTMLParser
 from src.utils import extract_attached_filenames, extract_attachments_by_name, clean_header_tags
 
 
 class ConfluencePageTreeBuilder:
     def __init__(self, confluence_client: Confluence, splitting_headers: list[tuple[str, str]]):
         self.confluence = confluence_client
-        self.chunker = HTMLChunker(splitting_headers)
+        self.parser = HTMLParser(splitting_headers)
 
     def search_pages(self, space=None, title=None, label=None, limit=None):
         query_parts = ['type = "page"']
@@ -75,7 +75,7 @@ class ConfluencePageTreeBuilder:
             html = html.replace(name, url)
 
         cleaned_html = clean_header_tags(html)
-        chunks = self.chunker.chunk(cleaned_html)
+        chunks = self.parser.chunk(cleaned_html)
 
         logger.debug(f"Fetched page '{title}' (ID: {page_id}), children: {include_children}")
 
@@ -83,6 +83,7 @@ class ConfluencePageTreeBuilder:
             "id": page_id,
             "title": title,
             "content": chunks,
+            "attachments": attachments,
             "last_modified": last_modified,
             "last_modified_by": last_modified_by,
             "child_pages": [],
