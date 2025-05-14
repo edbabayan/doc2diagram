@@ -80,6 +80,8 @@ def split_text(page, path, openai_client):
     for chunk in page_text:
         chunk_hierarchy = chunk.get("hierarchy", {})
         chunk_text = chunk.get("page_content", "")
+        chunk_attachments = chunk.get("attachments", [])
+
 
         logger.debug(f"Chunking text of length {len(chunk_text)} with hierarchy {chunk_hierarchy}")
         chunks_list = chunk_page(chunk_text, chunk_hierarchy, project_name)
@@ -97,7 +99,7 @@ def split_text(page, path, openai_client):
                     "project_name": chunk.project_name,
                     "source": path,
                     "source_page_id": page_id,
-                    "attachments": chunk.attachments,
+                    "attachments": chunk_attachments,
                     "last_modified": page['last_modified'],
                     "last_modified_by": page['last_modified_by'],
                 }
