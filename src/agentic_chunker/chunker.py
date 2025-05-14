@@ -70,10 +70,21 @@ def chunk_page(text, hierarchy, project_name):
     logger.debug(f"Text length: {len(text)} characters, Project: {project_name}")
 
     system_message = SystemMessage(content=AgentPrompts.chunker_prompt)
+
+    # Format the user message more clearly, separating the text and instructions
     user_message = HumanMessage(
-        content=f"Split the following text into appropriate chunks: {text} with hierarchy: {hierarchy} and {project_name}"
-                f"name of the project. "
-                f"Return multiple chunks, with each chunk representing a logical section of the text."
+        content=f"""
+Please split the following text into appropriate chunks:
+
+TEXT TO CHUNK:
+{text}
+
+ADDITIONAL CONTEXT:
+- Hierarchy: {hierarchy}
+- Project Name: {project_name}
+
+Return multiple chunks, with each chunk representing a logical section of the text.
+"""
     )
 
     # Bind the ChunkList tool instead of the single Chunk
@@ -110,7 +121,6 @@ def chunk_page(text, hierarchy, project_name):
         logger.exception("Detailed exception information:")
         # Return an empty list if chunking fails
         return []
-
 
 if __name__ == '__main__':
     logger.info("Running chunker test")
