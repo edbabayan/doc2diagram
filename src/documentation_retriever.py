@@ -83,8 +83,8 @@ class ConfluencePageTreeBuilder:
         filenames = extract_attached_filenames(html)
         attachments = extract_attachments_by_name(self.confluence, page_id, filenames)
 
-        for name, url in zip(filenames, attachments):
-            html = html.replace(name, url)
+        # for name, url in zip(filenames, attachments):
+        #     html = html.replace(name, url)
 
         cleaned_html = clean_header_tags(html)
         chunks = self.parser.chunk(cleaned_html)

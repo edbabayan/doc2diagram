@@ -69,7 +69,6 @@ class HTMLParser:
                 # Add to attachments list as a dict
                 attachments.append({
                     "file_name": short_name,
-                    "url": filename
                 })
 
                 # Get the plain text body if available
@@ -91,10 +90,9 @@ class HTMLParser:
                 # Add to attachments list as a dict
                 attachments.append({
                     "file_name": short_name,
-                    "url": filename
                 })
 
-                cell_content += f"![🖼️ {short_name}]({filename})"
+                cell_content += f"![🖼️ {short_name}]"
 
         # Process page links
         ri_pages = cell.find_all("ri:page")
@@ -119,7 +117,6 @@ class HTMLParser:
                             # Add to attachments list as a dict
                             attachments.append({
                                 "file_name": short_name,
-                                "url": filename
                             })
 
                             cell_content += f"- [📎 {short_name}]\n"
@@ -246,36 +243,34 @@ class HTMLParser:
                 for ac_image in sibling.find_all("ac:image"):
                     attachment = ac_image.find("ri:attachment")
                     if attachment and attachment.has_attr("ri:filename"):
-                        url = attachment['ri:filename']
-                        short_name = url.split('/')[-1].split('?')[0]
+                        filename = attachment['ri:filename']
+                        short_name = filename.split('/')[-1].split('?')[0]
 
                         # Add to attachments list as a dict
                         attachments.append({
                             "file_name": short_name,
-                            "url": url
                         })
 
-                        content_parts.append(f"![🖼️ {short_name}]({url})")
+                        content_parts.append(f"![🖼️ {short_name}]")
 
                 # Check for ac:link attachments
                 for ac_link in sibling.find_all("ac:link"):
                     attachment = ac_link.find("ri:attachment")
                     if attachment and attachment.has_attr("ri:filename"):
-                        url = attachment['ri:filename']
-                        short_name = url.split('/')[-1].split('?')[0]
+                        filename = attachment['ri:filename']
+                        short_name = filename.split('/')[-1].split('?')[0]
 
                         # Add to attachments list as a dict
                         attachments.append({
                             "file_name": short_name,
-                            "url": url
                         })
 
                         # Get the plain text body if available
                         plain_text_body = ac_link.find("ac:plain-text-link-body")
                         if plain_text_body and plain_text_body.get_text(strip=True):
-                            content_parts.append(f"[{plain_text_body.get_text(strip=True)}]({url})")
+                            content_parts.append(f"[{plain_text_body.get_text(strip=True)}]")
                         else:
-                            content_parts.append(f"[📎 {short_name}]({url})")
+                            content_parts.append(f"[📎 {short_name}]")
 
         # Combine all content
         result = "\n\n".join(filter(None, content_parts))
