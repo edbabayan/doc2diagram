@@ -16,5 +16,8 @@ class CFG:
         ("h1", "Section"),
         ("h2", "Subsection"),
         ("h3", "Topic"),
-        ("h4", "Sub‑topic"),
     ]
+
+    opeanai_embed_dim = 3072
+    embed_model = "text-embedding-3-large"
+    local_llm_model = 'qwen3:8b'
