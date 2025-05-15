@@ -10,9 +10,11 @@ from src.utils import extract_attached_filenames, extract_attachments_by_name, c
 
 
 class ConfluencePageTreeBuilder:
-    def __init__(self, confluence_client: Confluence, splitting_headers: list[tuple[str, str]]):
+    def __init__(self, confluence_client: Confluence, splitting_headers: list[tuple[str, str]], attachments_dir=None):
         self.confluence = confluence_client
         self.parser = HTMLParser(splitting_headers)
+        self.attachments_dir = attachments_dir
+        os.makedirs(attachments_dir, exist_ok=True)
 
     def search_pages(self, space=None, title=None, label=None, limit=None):
         query_parts = ['type = "page"']
@@ -42,6 +44,16 @@ class ConfluencePageTreeBuilder:
 
         title = page["title"]
         html = page["body"]["storage"]["value"]
+
+        attachments = self.confluence.get_attachments_from_content(page_id)
+
+        # Download each attachment
+        for attachment in attachments.get("results", []):
+            attachment_filename = attachment["title"]
+
+            self.confluence.download_attachments_from_page(page_id,
+                                                           filename=attachment_filename,
+                                                           path=self.attachments_dir)
 
         # Extract the last modification date and author
         last_modified = None
@@ -140,13 +152,13 @@ if __name__ == "__main__":
         logger.error(f"Failed to initialize Confluence client: {init_error}")
         raise
 
-    builder = ConfluencePageTreeBuilder(confluence, CFG.HEADERS_TO_SPLIT_ON)
+    builder = ConfluencePageTreeBuilder(confluence, CFG.HEADERS_TO_SPLIT_ON, CFG.attachments_dir)
 
     try:
         _project_name = "EPMRPP"
 
         results = builder.search_pages(space=_project_name, title="UX / UI")
         tree = builder.get_page_tree(results, project_name=_project_name)
-        builder.save_tree_to_json(tree, CFG.root / "confluence_page_tree.json")
+        builder.save_tree_to_json(tree, CFG.tree_file_path)
     except Exception as run_error:
         logger.critical(f"Execution failed: {run_error}")
