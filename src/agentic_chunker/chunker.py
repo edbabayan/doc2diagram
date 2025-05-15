@@ -1,13 +1,20 @@
-from pydantic import BaseModel, Field
 from typing import List
 from loguru import logger
+from pydantic import BaseModel, Field
 
+from dotenv import load_dotenv
+from langchain_openai.chat_models import ChatOpenAI
 from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from src.config import CFG
+from src.agentic_chunker.utils import encode_image
 from src.agentic_chunker.prompts import AgentPrompts
 
+# Load environment variables
+load_dotenv(dotenv_path=CFG.env_variable_file)
+
+openai = ChatOpenAI(model="gpt-4o", temperature=0)
 
 # Define the Chunk model
 class Chunk(BaseModel):
@@ -74,26 +81,28 @@ def chunk_page(text, hierarchy, project_name):
     # Format the user message more clearly, separating the text and instructions
     user_message = HumanMessage(
         content=f"""
-Please split the following text into appropriate chunks:
-
-TEXT TO CHUNK:
-{text}
-
-ADDITIONAL CONTEXT:
-- Hierarchy: {hierarchy}
-- Project Name: {project_name}
-
-Return multiple chunks, with each chunk representing a logical section of the text.
-"""
+            Please split the following text into appropriate chunks:
+            
+            TEXT TO CHUNK:
+            {text}
+            
+            ADDITIONAL CONTEXT:
+            - Hierarchy: {hierarchy}
+            - Project Name: {project_name}
+            
+            Return multiple chunks, with each chunk representing a logical section of the text.
+            """
     )
 
     # Bind the ChunkList tool instead of the single Chunk
     logger.debug("Binding ChunkList tool to language model")
     structured_qwen3 = qwen3.bind_tools([ChunkList])
 
+    structured_openai = openai.bind_tools([ChunkList])
+
     try:
         logger.info("Invoking language model to chunk text")
-        response = structured_qwen3.invoke([system_message, user_message])
+        response = structured_openai.invoke([system_message, user_message])
 
         # Get the raw chunks from the response
         raw_chunks = response.tool_calls[0]["args"].get("chunks", [])
@@ -101,6 +110,12 @@ Return multiple chunks, with each chunk representing a logical section of the te
         # Create properly formatted chunks with the manual hierarchy and project_name
         formatted_chunks = []
         for raw_chunk in raw_chunks:
+            # Extract images from attachments
+            attached_images = [attachment for attachment in raw_chunk.get("attachments", []) if attachment.endswith(('.png', '.jpg', '.jpeg'))]
+
+            # Generate image descriptions using the language model
+            # image_description = describe_image(openai, raw_chunk.get("text", ""), attached_images)
+
             # Create a complete chunk with manually provided hierarchy and project_name
             chunk = Chunk(
                 text=raw_chunk.get("text", ""),
@@ -122,17 +137,123 @@ Return multiple chunks, with each chunk representing a logical section of the te
         # Return an empty list if chunking fails
         return []
 
+
+def describe_image(llm, associated_text, attached_images):
+    """
+    Generates a description for an image using the language model.
+
+    Args:
+        llm: The language model to use for generating the description.
+        associated_text (str): The text associated with the image.
+        image_name (str): The name of the image file.
+
+    Returns:
+        str: A description of the image.
+    """
+    images_description = {}
+    for image_name in attached_images:
+        # Check if the image file exists
+        if not (CFG.attachments_dir / image_name).exists():
+            logger.warning(f"Image file {image_name} does not exist.")
+            continue
+        else:
+            image_path = CFG.attachments_dir / image_name
+            logger.info(f"Image file {image_name} exists at {image_path}")
+            # If the image file exists, generate a description
+            description = generate_image_description(llm, image_path, associated_text)
+            images_description[image_name] = description
+
+    return images_description
+
+
+def generate_image_description(llm, image_path, associated_text):
+    """
+    Generates a description for an image using the language model.
+
+    Args:
+        llm: The language model to use for generating the description.
+        image_path (str): The path of the image file.
+        associated_text (str): The text associated with the image.
+
+    Returns:
+        str: A description of the image.
+    """
+    base64_image = encode_image(image_path)
+    system_message = SystemMessage(
+        content="You are an expert image analyzer. You should describe the image, for example if the image contains text"
+                "return the text of the image or if the image contains a chart, return the data of the chart or if the "
+                "image contains a logo, return the name of the logo and say that it is a logo."
+    )
+
+    user_message = HumanMessage(
+        content=[
+            {
+                "type": "text",
+                "text": f"Describe this image. Consider its relation to this associated text: '{associated_text}'."
+            },
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/png;base64,{base64_image}"
+                }
+            }
+        ]
+    )
+
+    # Invoke the language model
+    logger.debug("Invoking language model for image description")
+    response = llm.invoke([system_message, user_message])
+
+    return response.content
+
+
 if __name__ == '__main__':
     logger.info("Running chunker test")
 
-    test_chunk = {'hierarchy': {'Subsection': 'About ReportPortal', 'Topic': 'Our brand story'},
-                  'page_content': "At ReportPortal, we are committed to delivering cutting-edge solutions that empower teams and organizations to achieve excellence in test automation and reporting. Our platform stands at the intersection of innovation and efficiency, providingreal-time analytics and insights into automated test results.\nOur mission\nОur mission is clear and resolute: to empower quality assurance excellence in the ever-evolving landscape of software development. We are dedicated to equipping QA professionals, testers, and development teams with the tools, knowledge,and resources they need to deliver exceptional software products.\nOur core values\n• Innovation:We're dedicated to pioneering new approaches and technologies that enhance testing efficiencyand effectiveness.\n• Collaboration:We foster a spirit of collaboration, recognizing that achieving QA excellence requires collective effort.\n• Empowerment:We empower testers and QA professionals by offering intuitive, user-friendly tools and resources.\n• Transparency:We provide clear documentation, guidelines, and support to ensure that you have a full understandingof how to maximize the potential of our platform.\n• Community:Our mission extends beyond our platform, as we actively engage with this community to share knowledgeand best practices.",
-                  'metadata': ['test automation',
-                               'reporting',
-                               'real-time analytics',
-                               'quality assurance',
-                               'community engagement'],
-                  'content_type': 'promotional'}
+    test_chunk = {
+            "hierarchy": {
+              "Subsection": "Logo"
+            },
+            "page_content": "![🖼️ image-2023-10-17_10-27-2.png](image-2023-10-17_10-27-2.png)\n\n[📎 RP_Logo_Pack.zip](RP_Logo_Pack.zip)\n\nThe logo helps to reflect one of the key ideas  of the product - focusing on detecting bugs in software. The focus - the main symbol of the product - helps emphasise this task and adds significance. The color scheme of the logo consists of topaz and black, giving it a stylish and professional appearance.\n\n![🖼️ image-2023-10-6_17-2-57.png](image-2023-10-6_17-2-57.png)\n\n![🖼️ image-2023-10-6_17-7-30.png](image-2023-10-6_17-7-30.png)\n\nClear space\n\nWhen using the logo, it is important to adhere to standard clear space and safe zone guidelines to ensure proper emphasis and differentiation from other branding elements. This also ensures consistency in logo usage and effective perception across different contexts.\n\n![🖼️ image-2023-10-6_17-10-29.png](image-2023-10-6_17-10-29.png)\n\nTo prevent distortion of the logo and ensure its clear understanding, there are recommended minimum sizes for the logo. Depending on the application method and material, the minimum size of the logo may vary. However, the main factor remains the clear readability of the logo.\n\n![🖼️ image-2023-10-6_17-12-19.png](image-2023-10-6_17-12-19.png)\n\nIncorrect usage\n\nOur logo is an important component of brand recognition, so it is important to follow the rules below in order not to violate the integrity and recognition of the ReportPortal logo.\n\n![🖼️ image-2023-10-6_17-14-52.png](image-2023-10-6_17-14-52.png)\n\nSymbol\n\nTo maintain clarity and readability of the symbol, it is important to adhere to a clear space around it. The minimum clear space should be equal to half of the size of the symbol.\n\n![🖼️ image-2023-10-6_17-31-35.png](image-2023-10-6_17-31-35.png)\n\nIt is also recommended to use the symbol only with the branded colors, as shown in the example below.\n\n![🖼️ image-2023-10-6_17-32-42.png](image-2023-10-6_17-32-42.png)",
+            "attachments": [
+              {
+                "file_name": "image-2023-10-17_10-27-2.png",
+                "url": "image-2023-10-17_10-27-2.png"
+              },
+              {
+                "file_name": "RP_Logo_Pack.zip",
+                "url": "RP_Logo_Pack.zip"
+              },
+              {
+                "file_name": "image-2023-10-6_17-2-57.png",
+                "url": "image-2023-10-6_17-2-57.png"
+              },
+              {
+                "file_name": "image-2023-10-6_17-7-30.png",
+                "url": "image-2023-10-6_17-7-30.png"
+              },
+              {
+                "file_name": "image-2023-10-6_17-10-29.png",
+                "url": "image-2023-10-6_17-10-29.png"
+              },
+              {
+                "file_name": "image-2023-10-6_17-12-19.png",
+                "url": "image-2023-10-6_17-12-19.png"
+              },
+              {
+                "file_name": "image-2023-10-6_17-14-52.png",
+                "url": "image-2023-10-6_17-14-52.png"
+              },
+              {
+                "file_name": "image-2023-10-6_17-31-35.png",
+                "url": "image-2023-10-6_17-31-35.png"
+              },
+              {
+                "file_name": "image-2023-10-6_17-32-42.png",
+                "url": "image-2023-10-6_17-32-42.png"
+              }
+            ]
+          }
 
     # Example usage
     hierarchy_test = test_chunk['hierarchy']

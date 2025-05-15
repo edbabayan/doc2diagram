@@ -47,8 +47,8 @@ class AgentPrompts:
        - Keep tables, charts, and visual elements intact with their descriptions.
 
     8. **Attachment Handling (CRITICAL):**
-       - ALL [Attachment] tags MUST be preserved with their complete URLs and descriptions.
-       - Example: "[https://example.com/file.pdf](https://example.com/file.pdf) (PDF)" must appear exactly as shown.
+       - ALL [Attachment] tags MUST be preserved with only their file names.
+       - Example: "[file_name_1.png, file_name_2.pdf]" must appear exactly as shown.
        - Never shorten, simplify, or remove attachment references.
        - Keep attachment context by including surrounding text in the same chunk.
        - URLs must remain completely unmodified, including all parameters and special characters.
