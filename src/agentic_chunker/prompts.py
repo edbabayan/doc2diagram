@@ -47,7 +47,8 @@ class AgentPrompts:
        - Keep tables, charts, and visual elements intact with their descriptions.
 
     8. **Attachment Handling (CRITICAL):**
-       - ALL [Attachment] tags MUST be preserved with only their file names.
+        - ALL attachments MUST be referenced in the output.
+       - ALL the attached files MUST be preserved with only their file names.
        - Example: "[file_name_1.png, file_name_2.pdf]" must appear exactly as shown.
        - Never shorten, simplify, or remove attachment references.
        - Keep attachment context by including surrounding text in the same chunk.
@@ -83,10 +84,6 @@ class AgentPrompts:
     - VERIFY that your output includes ALL [Attachment] markers, URLs, and file references from the original text.
     - NEVER create chunks consisting of single sentences or very small text fragments.
     - When in doubt about chunk size, err on the side of LARGER chunks rather than smaller ones.
-
-    **Example:**
-    If input contains: "Brand guide introduction. [Attachment] [https://kb.example.com/file.png](https://kb.example.com/file.png) (PNG)"
-    Output MUST contain: "Brand guide introduction. [Attachment] [https://kb.example.com/file.png](https://kb.example.com/file.png) (PNG)"
 
     ANY chunking that removes or modifies attachments is INCORRECT and unacceptable.
     ANY chunking that creates single-sentence or very small text fragments is INCORRECT and unacceptable.
