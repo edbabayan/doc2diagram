@@ -82,9 +82,11 @@ def split_text(page, path, openai_client):
         chunk_text = chunk.get("page_content", "")
         chunk_attachments = chunk.get("attachments", [])
 
+        if chunk_hierarchy != {"Subsection": "Logo"}:
+            continue
 
         logger.debug(f"Chunking text of length {len(chunk_text)} with hierarchy {chunk_hierarchy}")
-        chunks_list = chunk_page(chunk_text, chunk_hierarchy, project_name)
+        chunks_list = chunk_page(chunk_text, chunk_hierarchy, chunk_attachments, project_name)
 
         for idx, chunk in enumerate(tqdm(chunks_list, desc="Exporting chunks", leave=True)):
             try:
@@ -99,7 +101,7 @@ def split_text(page, path, openai_client):
                     "project_name": chunk.project_name,
                     "source": path,
                     "source_page_id": page_id,
-                    "attachments": chunk_attachments,
+                    "attachments": chunk.attachments,
                     "last_modified": page['last_modified'],
                     "last_modified_by": page['last_modified_by'],
                 }
