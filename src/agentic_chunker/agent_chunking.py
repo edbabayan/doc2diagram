@@ -82,9 +82,6 @@ def split_text(page, path, openai_client):
         chunk_text = chunk.get("page_content", "")
         chunk_attachments = chunk.get("attachments", [])
 
-        if chunk_hierarchy != {"Subsection": "Logo"}:
-            continue
-
         logger.debug(f"Chunking text of length {len(chunk_text)} with hierarchy {chunk_hierarchy}")
         chunks_list = chunk_page(chunk_text, chunk_hierarchy, chunk_attachments, project_name)
 
