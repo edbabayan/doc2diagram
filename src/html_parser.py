@@ -491,6 +491,200 @@ class HTMLParser:
 
         return "\n".join(markdown_parts)
 
+    def _extract_table_data(self, soup: BeautifulSoup) -> Tuple[List[Dict[str, Any]], BeautifulSoup]:
+        """
+        Extracts Confluence table macros data from the HTML and removes them from the soup.
+
+        Args:
+            soup (BeautifulSoup): BeautifulSoup object of the HTML
+
+        Returns:
+            Tuple[List[Dict[str, Any]], BeautifulSoup]: Tuple containing list of extracted table data objects
+            and the modified soup with tables removed
+        """
+        tables_data = []
+
+        # Look for both standard tables and table-chart macros
+        standard_tables = soup.find_all('table')
+        table_chart_macros = soup.find_all('ac:structured-macro', {'ac:name': 'table-chart'})
+        table_filter_macros = soup.find_all('ac:structured-macro', {'ac:name': 'table-filter'})
+
+        logger.info(f"Found {len(standard_tables)} standard tables in the HTML")
+        logger.info(f"Found {len(table_chart_macros)} table-chart macros in the HTML")
+        logger.info(f"Found {len(table_filter_macros)} table-filter macros in the HTML")
+
+        # Process standard HTML tables
+        for i, table in enumerate(standard_tables):
+            logger.info(f"Processing standard table #{i + 1}")
+
+            try:
+                # Extract table headers
+                headers = []
+                header_row = table.find('tr')
+                if header_row:
+                    headers = [th.get_text(strip=True) for th in header_row.find_all(['th', 'td'])]
+
+                # Extract table rows
+                rows = []
+                data_rows = table.find_all('tr')[1:] if headers else table.find_all('tr')
+
+                for row in data_rows:
+                    cells = row.find_all(['td', 'th'])
+                    row_data = [cell.get_text(strip=True) for cell in cells]
+                    rows.append(row_data)
+
+                table_data = {
+                    "type": "standard_table",
+                    "headers": headers,
+                    "rows": rows,
+                    "markdown": self._html_table_to_markdown(table)[0]  # Use existing method
+                }
+
+                tables_data.append(table_data)
+                logger.info(f"Successfully processed standard table #{i + 1}")
+
+            except Exception as e:
+                logger.error(f"Error processing standard table #{i + 1}: {str(e)}")
+
+        # Process table-chart macros
+        for i, macro in enumerate(table_chart_macros):
+            logger.info(f"Processing table-chart macro #{i + 1}")
+
+            try:
+                # Extract parameters from the macro
+                parameters = {}
+                for param in macro.find_all('ac:parameter'):
+                    name = param.get('ac:name')
+                    value = param.text
+                    parameters[name] = value
+
+                # Find the nested table within the rich-text-body
+                rich_text_body = macro.find('ac:rich-text-body')
+                nested_tables = []
+
+                if rich_text_body:
+                    # Try to find table-filter macro first
+                    filter_macro = rich_text_body.find('ac:structured-macro', {'ac:name': 'table-filter'})
+
+                    if filter_macro:
+                        filter_rich_text = filter_macro.find('ac:rich-text-body')
+                        if filter_rich_text:
+                            nested_tables = filter_rich_text.find_all('table')
+                    else:
+                        # Look for direct tables
+                        nested_tables = rich_text_body.find_all('table')
+
+                for j, nested_table in enumerate(nested_tables):
+                    # Process each nested table
+                    table_markdown, _ = self._html_table_to_markdown(nested_table)
+
+                    # Extract headers and rows
+                    headers = []
+                    rows = []
+
+                    header_row = nested_table.find('tr')
+                    if header_row:
+                        headers = [th.get_text(strip=True) for th in header_row.find_all(['th', 'td'])]
+
+                    data_rows = nested_table.find_all('tr')[1:] if headers else nested_table.find_all('tr')
+                    for row in data_rows:
+                        cells = row.find_all(['td', 'th'])
+                        row_data = [cell.get_text(strip=True) for cell in cells]
+                        rows.append(row_data)
+
+                    chart_data = {
+                        "type": "table_chart",
+                        "parameters": parameters,
+                        "headers": headers,
+                        "rows": rows,
+                        "markdown": table_markdown
+                    }
+
+                    tables_data.append(chart_data)
+                    logger.info(f"Successfully processed table-chart #{i + 1}, nested table #{j + 1}")
+
+            except Exception as e:
+                logger.error(f"Error processing table-chart macro #{i + 1}: {str(e)}")
+
+        # Process standalone table-filter macros (if not already processed as part of table-chart)
+        for i, macro in enumerate(table_filter_macros):
+            # Skip if this macro is within a table-chart (already processed)
+            if macro.parent and macro.parent.parent and macro.parent.parent.name == 'ac:structured-macro' and macro.parent.parent.get(
+                    'ac:name') == 'table-chart':
+                continue
+
+            logger.info(f"Processing standalone table-filter macro #{i + 1}")
+
+            try:
+                # Extract parameters from the macro
+                parameters = {}
+                for param in macro.find_all('ac:parameter'):
+                    name = param.get('ac:name')
+                    value = param.text
+                    parameters[name] = value
+
+                # Find the nested table
+                rich_text_body = macro.find('ac:rich-text-body')
+                if rich_text_body:
+                    nested_tables = rich_text_body.find_all('table')
+
+                    for j, nested_table in enumerate(nested_tables):
+                        # Process each nested table
+                        table_markdown, _ = self._html_table_to_markdown(nested_table)
+
+                        # Extract headers and rows
+                        headers = []
+                        rows = []
+
+                        header_row = nested_table.find('tr')
+                        if header_row:
+                            headers = [th.get_text(strip=True) for th in header_row.find_all(['th', 'td'])]
+
+                        data_rows = nested_table.find_all('tr')[1:] if headers else nested_table.find_all('tr')
+                        for row in data_rows:
+                            cells = row.find_all(['td', 'th'])
+                            row_data = [cell.get_text(strip=True) for cell in cells]
+                            rows.append(row_data)
+
+                        filter_data = {
+                            "type": "table_filter",
+                            "parameters": parameters,
+                            "headers": headers,
+                            "rows": rows,
+                            "markdown": table_markdown
+                        }
+
+                        tables_data.append(filter_data)
+                        logger.info(f"Successfully processed table-filter #{i + 1}, nested table #{j + 1}")
+
+            except Exception as e:
+                logger.error(f"Error processing table-filter macro #{i + 1}: {str(e)}")
+
+        # Now remove all the tables from the soup
+        # 1. Remove standard tables
+        for table in standard_tables:
+            table.decompose()
+        logger.info(f"Removed {len(standard_tables)} standard tables from the soup")
+
+        # 2. Remove table-chart macros
+        for macro in table_chart_macros:
+            macro.decompose()
+        logger.info(f"Removed {len(table_chart_macros)} table-chart macros from the soup")
+
+        # 3. Remove standalone table-filter macros
+        standalone_filter_macros = []
+        for macro in table_filter_macros:
+            # Check if this is a standalone macro (not inside a table-chart)
+            if not (macro.parent and macro.parent.parent and
+                    macro.parent.parent.name == 'ac:structured-macro' and
+                    macro.parent.parent.get('ac:name') == 'table-chart'):
+                standalone_filter_macros.append(macro)
+                macro.decompose()
+
+        logger.info(f"Removed {len(standalone_filter_macros)} standalone table-filter macros from the soup")
+
+        return tables_data, soup
+
 
     def chunk(self, html: str) -> List[Dict[str, Any]]:
         """
@@ -524,6 +718,35 @@ class HTMLParser:
             })
 
             logger.info(f"Added roadmap chunk: {roadmap['title']}")
+
+        # Next, extract table data
+        tables, soup = self._extract_table_data(soup)
+
+        # Add table data as special chunks
+        for i, table in enumerate(tables):
+            table_type = table.get("type", "unknown_table")
+            table_title = f"Table {i + 1}"
+
+            # Try to get a meaningful title from the parameters or context
+            if table_type == "table_chart" and "column" in table.get("parameters", {}):
+                table_title = f"Chart: {table['parameters']['column']}"
+            elif table_type == "table_filter" and "sort" in table.get("parameters", {}):
+                table_title = f"Filtered Table: {table['parameters']['sort']}"
+            elif table.get("headers") and len(table.get("headers", [])) > 0:
+                table_title = f"Table: {table['headers'][0]} and {len(table['headers']) - 1} other columns"
+
+            chunks.append({
+                "hierarchy": {"table": table_title},
+                "page_content": table.get("markdown", ""),
+                "data": {
+                    "headers": table.get("headers", []),
+                    "rows": table.get("rows", []),
+                    "parameters": table.get("parameters", {})
+                },
+                "type": table_type
+            })
+
+            logger.info(f"Added table chunk: {table_title}")
 
         # Now process the regular content as before
         headers = soup.find_all(list(self.header_tags.keys()))

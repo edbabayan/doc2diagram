@@ -155,7 +155,7 @@ if __name__ == "__main__":
     try:
         _project_name = "EPMRPP"
 
-        results = builder.search_pages(space=_project_name, title="JavaScript agents")
+        results = builder.search_pages(space=_project_name, title="UX / UI")
         tree = builder.get_page_tree(results, project_name=_project_name)
         builder.save_tree_to_json(tree, CFG.tree_file_path)
     except Exception as run_error:
