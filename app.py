@@ -2,17 +2,14 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
-from qdrant_client import QdrantClient
 from src.config import CFG  # Assuming you're keeping your config
 
-# Import your existing functions
 from chatbot import (
     connect_to_qdrant,
     query_retrieval_system,
-    generate_answer
 )
 
-# Load environment variables
+
 load_dotenv(dotenv_path=CFG.env_variable_file)
 
 # Page configuration
