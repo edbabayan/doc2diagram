@@ -1,6 +1,8 @@
 from loguru import logger
 from bs4 import BeautifulSoup, Tag
 from typing import List, Dict, Tuple, Any
+import json
+import urllib.parse
 
 
 class HTMLParser:
@@ -37,6 +39,83 @@ class HTMLParser:
         }
         new_meta[label] = header_text
         return new_meta
+
+    def _extract_roadmap_data(self, soup: BeautifulSoup) -> Tuple[List[Dict[str, Any]], BeautifulSoup]:
+        """
+        Extracts Confluence roadmap macros data from the HTML and removes them from the soup.
+
+        Args:
+            soup (BeautifulSoup): BeautifulSoup object of the HTML
+
+        Returns:
+            Tuple[List[Dict[str, Any]], BeautifulSoup]: Tuple containing list of extracted roadmap data objects
+            and the modified soup with roadmap macros removed
+        """
+        roadmaps = []
+        roadmap_macros = soup.find_all('ac:structured-macro', {'ac:name': 'roadmap'})
+
+        if not roadmap_macros:
+            return roadmaps, soup
+
+        logger.info(f"Found {len(roadmap_macros)} roadmap macro(s) in the HTML")
+
+        for i, macro in enumerate(roadmap_macros):
+            logger.info(f"Processing roadmap #{i + 1}")
+
+            # Find the source parameter which contains the encoded JSON data
+            source_param = macro.find('ac:parameter', {'ac:name': 'source'})
+
+            if not source_param:
+                logger.warning(f"Roadmap #{i + 1} has no source parameter")
+                continue
+
+            try:
+                # URL decode the content
+                encoded_json = source_param.text
+                decoded_json = urllib.parse.unquote(encoded_json)
+
+                # Parse the JSON data
+                roadmap_data = json.loads(decoded_json)
+
+                # Process the roadmap data
+                processed_data = {
+                    "type": "roadmap",
+                    "title": roadmap_data.get('title', 'Unnamed Roadmap'),
+                    "timeline": roadmap_data.get('timeline', {}),
+                    "items": []
+                }
+
+                # Process lanes and bars (tasks)
+                for lane in roadmap_data.get('lanes', []):
+                    lane_title = lane.get('title', 'Unnamed Lane')
+                    lane_color = lane.get('color', {}).get('lane', '#ffffff')
+
+                    for bar in lane.get('bars', []):
+                        processed_data["items"].append({
+                            "lane": lane_title,
+                            "title": bar.get('title', 'Unnamed Task'),
+                            "description": bar.get('description', ''),
+                            "start_date": bar.get('startDate', 'N/A'),
+                            "duration": bar.get('duration', 0),
+                            "row_index": bar.get('rowIndex', 0),
+                            "id": bar.get('id', '')
+                        })
+
+                roadmaps.append(processed_data)
+                logger.info(f"Successfully processed roadmap: {processed_data['title']}")
+
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse JSON data from roadmap #{i + 1}: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error processing roadmap #{i + 1}: {str(e)}")
+
+        # Remove all roadmap macros from the soup
+        for macro in roadmap_macros:
+            macro.decompose()
+
+        logger.info(f"Removed {len(roadmap_macros)} roadmap macro(s) from the soup")
+
+        return roadmaps, soup
 
     def _process_cell_content(self, cell: Tag) -> Tuple[str, List[Dict[str, str]]]:
         """
@@ -277,23 +356,192 @@ class HTMLParser:
 
         return result.strip(), attachments
 
+    def _process_entire_body(self, soup: BeautifulSoup) -> Tuple[str, List[Dict[str, str]]]:
+        """
+        Process the entire body of HTML when no headers are present.
+        Extracts content and attachments from the whole document.
+
+        Args:
+            soup (BeautifulSoup): BeautifulSoup object of the HTML
+
+        Returns:
+            Tuple[str, List[Dict[str, str]]]: Page content and list of attachments
+        """
+        content_parts = []
+        attachments = []
+        body = soup.body if soup.body else soup
+
+        # Process all elements in the body
+        for element in body.find_all(True):  # True selects all elements
+            # Skip header tags that we're configured to use for chunking
+            if element.name in self.header_tags:
+                continue
+
+            # Handle tables
+            if element.name == 'table':
+                markdown_table, table_attachments = self._html_table_to_markdown(element)
+                if markdown_table:
+                    content_parts.append(markdown_table)
+                    attachments.extend(table_attachments)
+                continue
+
+            # Extract text content
+            text = element.get_text(strip=True)
+            if text and element.parent.name != 'table':  # Avoid duplicating table content
+                content_parts.append(text)
+
+            # Process attachments and links
+            # Images
+            for img in element.find_all("img"):
+                src = img.get("src", "")
+                alt = img.get("alt", "Image")
+                if src:
+                    content_parts.append(f"![{alt}]({src})")
+
+            # Links
+            for link in element.find_all("a"):
+                href = link.get("href", "")
+                text = link.get_text(strip=True) or href
+                if href:
+                    content_parts.append(f"[{text}]({href})")
+
+            # Confluence-specific attachments (ac:image)
+            for ac_image in element.find_all("ac:image"):
+                attachment = ac_image.find("ri:attachment")
+                if attachment and attachment.has_attr("ri:filename"):
+                    filename = attachment['ri:filename']
+                    short_name = filename.split('/')[-1].split('?')[0]
+                    attachments.append({
+                        "file_name": short_name,
+                    })
+                    content_parts.append(f"![🖼️ {short_name}]")
+
+            # Confluence-specific links (ac:link)
+            for ac_link in element.find_all("ac:link"):
+                attachment = ac_link.find("ri:attachment")
+                if attachment and attachment.has_attr("ri:filename"):
+                    filename = attachment['ri:filename']
+                    short_name = filename.split('/')[-1].split('?')[0]
+                    attachments.append({
+                        "file_name": short_name,
+                    })
+                    plain_text_body = ac_link.find("ac:plain-text-link-body")
+                    if plain_text_body and plain_text_body.get_text(strip=True):
+                        content_parts.append(f"[{plain_text_body.get_text(strip=True)}]({filename})")
+                    else:
+                        content_parts.append(f"[📎 {short_name}]")
+
+        # Filter out empty strings and join
+        filtered_content = list(filter(None, content_parts))
+        result = "\n\n".join(filtered_content)
+
+        return result.strip(), attachments
+
+    def _roadmap_to_markdown(self, roadmap_data: Dict[str, Any]) -> str:
+        """
+        Converts roadmap data to a markdown representation.
+
+        Args:
+            roadmap_data (Dict[str, Any]): Processed roadmap data
+
+        Returns:
+            str: Markdown representation of the roadmap
+        """
+        markdown_parts = []
+
+        # Add title and timeline info
+        markdown_parts.append(f"# {roadmap_data['title']}")
+
+        timeline = roadmap_data.get('timeline', {})
+        if timeline:
+            start_date = timeline.get('startDate', 'N/A')
+            end_date = timeline.get('endDate', 'N/A')
+            markdown_parts.append(f"**Timeline:** {start_date} to {end_date}")
+
+        # Add items table
+        items = roadmap_data.get('items', [])
+        if items:
+            markdown_parts.append("\n## Roadmap Items")
+
+            # Get all unique keys from all items to use as column headers
+            all_keys = set()
+            for item in items:
+                all_keys.update(item.keys())
+
+            # Create the header row
+            header_row = "| " + " | ".join(all_keys) + " |"
+            markdown_parts.append(header_row)
+
+            # Create the separator row
+            separator_row = "| " + " | ".join(["------" for _ in all_keys]) + " |"
+            markdown_parts.append(separator_row)
+
+            # Add each item as a row
+            for item in items:
+                row_values = []
+                for key in all_keys:
+                    # Get value, replace newlines, and use 'N/A' if missing
+                    value = item.get(key, 'N/A')
+                    if isinstance(value, str):
+                        value = value.replace('\n', ' ')
+                    row_values.append(str(value))
+
+                row = "| " + " | ".join(row_values) + " |"
+                markdown_parts.append(row)
+
+        return "\n".join(markdown_parts)
+
+
     def chunk(self, html: str) -> List[Dict[str, Any]]:
         """
         Chunks the HTML document into structured sections based on headers.
+        If no headers are found, the entire document is treated as a single chunk.
+        Also extracts roadmap data from structured macros.
 
         Args:
             html (str): Raw HTML content to be chunked.
 
         Returns:
             List[Dict[str, Any]]: Chunks with 'hierarchy', 'page_content', and 'attachments'.
+                                 Roadmap data is included as special chunks with 'type': 'roadmap'.
         """
         soup = BeautifulSoup(html, "lxml", from_encoding="utf-8")
         self._clean_headers(soup)
 
         chunks = []
-        current_meta = {}
+
+        # First, extract any roadmaps from the document
+        roadmaps, soup = self._extract_roadmap_data(soup)
+
+        # Add roadmaps as special chunks
+        for roadmap in roadmaps:
+            # Convert the roadmap data to markdown for better readability
+            roadmap_markdown = self._roadmap_to_markdown(roadmap)
+
+            chunks.append({
+                "hierarchy": {"roadmap": roadmap["title"]},
+                "page_content": roadmap_markdown,
+            })
+
+            logger.info(f"Added roadmap chunk: {roadmap['title']}")
+
+        # Now process the regular content as before
         headers = soup.find_all(list(self.header_tags.keys()))
 
+        # If no headers found, process the entire document as one chunk
+        if not headers:
+            logger.info("No headers found. Processing entire document as one chunk.")
+            content, attachments = self._process_entire_body(soup)
+            if content:
+                chunks.append({
+                    "hierarchy": {},  # Empty hierarchy since no headers
+                    "page_content": content,
+                    "attachments": attachments
+                })
+            return chunks
+
+        # If headers are found, process as before
+        current_meta = {}
         for header in headers:
             tag_name = header.name
             header_text = header.get_text(strip=True)

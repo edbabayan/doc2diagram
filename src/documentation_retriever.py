@@ -83,11 +83,9 @@ class ConfluencePageTreeBuilder:
         filenames = extract_attached_filenames(html)
         attachments = extract_attachments_by_name(self.confluence, page_id, filenames)
 
-        # for name, url in zip(filenames, attachments):
-        #     html = html.replace(name, url)
-
         cleaned_html = clean_header_tags(html)
         chunks = self.parser.chunk(cleaned_html)
+
 
         logger.debug(f"Fetched page '{title}' (ID: {page_id}), children: {include_children}")
 
@@ -157,7 +155,7 @@ if __name__ == "__main__":
     try:
         _project_name = "EPMRPP"
 
-        results = builder.search_pages(space=_project_name, title="UX / UI")
+        results = builder.search_pages(space=_project_name, title="JavaScript agents")
         tree = builder.get_page_tree(results, project_name=_project_name)
         builder.save_tree_to_json(tree, CFG.tree_file_path)
     except Exception as run_error:
