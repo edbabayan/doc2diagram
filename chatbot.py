@@ -142,7 +142,9 @@ if __name__ == "__main__":
     _openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
     # Test with a sample query
-    _query = "Please  tell me about incorrect logo usages, what I should avoid?"
+    _query = "tell me test framework weekly downloads for Playwright"
+    # _query = "please tell me about Proxy issues (WF/JPMC) start time"
+
     retrieved_docs = query_retrieval_system(_qdrant_client, _collection_name, _query, _openai_client, k=3)
 
     # Generate answer
