@@ -181,9 +181,19 @@ def chunk_page(text, hierarchy, attached_files, project_name):
                             description = ""
                         processed_attachments.append({attachment: description})
 
+            # Extract the hierarchy values and convert to a list
+            hierarchy_values = list(hierarchy.values())
+
+            # Create a string from the hierarchy values, each on a new line
+            hierarchy_prefix = '\n'.join(hierarchy_values) + '\n\n'
+
+            # Add the hierarchy values to the beginning of the text
+            modified_text = hierarchy_prefix + raw_chunk['text']
+
+
             # Create a complete chunk with manually provided hierarchy and project_name
             chunk = Chunk(
-                text=raw_chunk.get("text", ""),
+                text=modified_text,
                 hierarchy=hierarchy,  # Manually set hierarchy
                 keywords=raw_chunk.get("keywords", []),
                 content_type=raw_chunk.get("content_type", "unknown"),
@@ -275,40 +285,22 @@ if __name__ == '__main__':
     logger.info("Running chunker test")
 
     test_chunk = {
-            "hierarchy": {
-              "Subsection": "Logo"
-            },
-            "page_content": "![🖼️ image-2023-10-17_10-27-2.png]\n\n[📎 RP_Logo_Pack.zip]\n\nThe logo helps to reflect one of the key ideas  of the product - focusing on detecting bugs in software. The focus - the main symbol of the product - helps emphasise this task and adds significance. The color scheme of the logo consists of topaz and black, giving it a stylish and professional appearance.\n\n![🖼️ image-2023-10-6_17-2-57.png]\n\n![🖼️ image-2023-10-6_17-7-30.png]\n\nClear space\n\nWhen using the logo, it is important to adhere to standard clear space and safe zone guidelines to ensure proper emphasis and differentiation from other branding elements. This also ensures consistency in logo usage and effective perception across different contexts.\n\n![🖼️ image-2023-10-6_17-10-29.png]\n\nTo prevent distortion of the logo and ensure its clear understanding, there are recommended minimum sizes for the logo. Depending on the application method and material, the minimum size of the logo may vary. However, the main factor remains the clear readability of the logo.\n\n![🖼️ image-2023-10-6_17-12-19.png]\n\nIncorrect usage\n\nOur logo is an important component of brand recognition, so it is important to follow the rules below in order not to violate the integrity and recognition of the ReportPortal logo.\n\n![🖼️ image-2023-10-6_17-14-52.png]\n\nSymbol\n\nTo maintain clarity and readability of the symbol, it is important to adhere to a clear space around it. The minimum clear space should be equal to half of the size of the symbol.\n\n![🖼️ image-2023-10-6_17-31-35.png]\n\nIt is also recommended to use the symbol only with the branded colors, as shown in the example below.\n\n![🖼️ image-2023-10-6_17-32-42.png]",
-            "attachments": [
-              {
-                "file_name": "image-2023-10-17_10-27-2.png"
-              },
-              {
-                "file_name": "RP_Logo_Pack.zip"
-              },
-              {
-                "file_name": "image-2023-10-6_17-2-57.png"
-              },
-              {
-                "file_name": "image-2023-10-6_17-7-30.png"
-              },
-              {
-                "file_name": "image-2023-10-6_17-10-29.png"
-              },
-              {
-                "file_name": "image-2023-10-6_17-12-19.png"
-              },
-              {
-                "file_name": "image-2023-10-6_17-14-52.png"
-              },
-              {
-                "file_name": "image-2023-10-6_17-31-35.png"
-              },
-              {
-                "file_name": "image-2023-10-6_17-32-42.png"
-              }
-            ]
+        "id": "1049861440",
+        "title": "JS agents & client release pipeline",
+        "content": [
+          {
+            "type": "content",
+            "hierarchy": {},
+            "page_content": "trueJs-agents release pipelinefalseautotoptrue9416\n\ntrueJs-agents release pipelinefalseautotoptrue9416\n\ntrue\n\nJs-agents release pipeline\n\nfalse\n\nauto\n\ntop\n\ntrue\n\n941\n\n6\n\nRelease steps:\n\nCreate a Pull Request from develop to master branch, name it as \"Release {Release version}\"Run the agent examples fromexamples repowith release candidate, ensure that everything is fine and attach the launch link in ReportPortal to the Pull Request description.Also provide some notes or screenshots if necessary.Fill in or update theCHANGELOG.md.Guide for changelog entries -https://keepachangelog.com/en/1.1.0/.Do not forget to mention contributors here in case the Pull Request contains changes from them.UpdateREADME.mdif applicable.Updateversion_fragmentfile with necessary version fragment to bump next release version correctly (the default fragment ispatch).Note: do not change version inVERSIONfile orpackage.jsonmanually.Receive at least 1 approve from team members (preferably from Team Lead).Merge Pull Request to master viamerge commit.Note: do not use rebase&merge/squash&merge options to avoid commits duplication during master→develop synchronization and to keep the history clean.All further steps according to the diagram will be performed automatically.Note: recheck that all pipelines finished successfully (GitHub tag & release created, develop updated with changes from master, packages published to NPM and GitHub packages registries).\n\n[examples repo](https://github.com/reportportal/examples-js)\n\n[https://keepachangelog.com/en/1.1.0/](https://keepachangelog.com/en/1.1.0/)\n\nCreate a Pull Request from develop to master branch, name it as \"Release {Release version}\"\n\nRun the agent examples fromexamples repowith release candidate, ensure that everything is fine and attach the launch link in ReportPortal to the Pull Request description.Also provide some notes or screenshots if necessary.\n\n[examples repo](https://github.com/reportportal/examples-js)\n\nexamples repo\n\nFill in or update theCHANGELOG.md.Guide for changelog entries -https://keepachangelog.com/en/1.1.0/.\n\n[https://keepachangelog.com/en/1.1.0/](https://keepachangelog.com/en/1.1.0/)\n\nCHANGELOG.md\n\nhttps://keepachangelog.com/en/1.1.0/\n\nDo not forget to mention contributors here in case the Pull Request contains changes from them.\n\nUpdateREADME.mdif applicable.\n\nREADME.md\n\nUpdateversion_fragmentfile with necessary version fragment to bump next release version correctly (the default fragment ispatch).Note: do not change version inVERSIONfile orpackage.jsonmanually.\n\nversion_fragment\n\npatch\n\nVERSION\n\npackage.json\n\nReceive at least 1 approve from team members (preferably from Team Lead).\n\nMerge Pull Request to master viamerge commit.Note: do not use rebase&merge/squash&merge options to avoid commits duplication during master→develop synchronization and to keep the history clean.\n\nmerge commit.\n\nAll further steps according to the diagram will be performed automatically.Note: recheck that all pipelines finished successfully (GitHub tag & release created, develop updated with changes from master, packages published to NPM and GitHub packages registries).\n\nSemver versions guide:\n\nhttps://semver.org/\n\n[https://semver.org/](https://semver.org/)\n\nhttps://semver.org/",
+            "attachments": []
           }
+        ],
+        "attachments": [],
+        "last_modified": "2025-01-31T11:08:21.502Z",
+        "last_modified_by": "Ilya Hancharyk",
+        "child_pages": [],
+        "project_name": "EPMRPP"
+      }
 
     # Example usage
     hierarchy_test = test_chunk['hierarchy']
