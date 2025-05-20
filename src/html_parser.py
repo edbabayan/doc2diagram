@@ -40,7 +40,8 @@ class HTMLParser:
         new_meta[label] = header_text
         return new_meta
 
-    def _extract_roadmap_data(self, soup: BeautifulSoup) -> Tuple[List[Dict[str, Any]], BeautifulSoup]:
+    @staticmethod
+    def _extract_roadmap_data(soup: BeautifulSoup) -> Tuple[List[Dict[str, Any]], BeautifulSoup]:
         """
         Extracts Confluence roadmap macros data from the HTML and removes them from the soup.
 
@@ -88,7 +89,6 @@ class HTMLParser:
                 # Process lanes and bars (tasks)
                 for lane in roadmap_data.get('lanes', []):
                     lane_title = lane.get('title', 'Unnamed Lane')
-                    lane_color = lane.get('color', {}).get('lane', '#ffffff')
 
                     for bar in lane.get('bars', []):
                         processed_data["items"].append({
@@ -117,7 +117,8 @@ class HTMLParser:
 
         return roadmaps, soup
 
-    def _process_cell_content(self, cell: Tag) -> Tuple[str, List[Dict[str, str]]]:
+    @staticmethod
+    def _process_cell_content(cell: Tag) -> Tuple[str, List[Dict[str, str]]]:
         """
         Processes a table cell's content, extracting rich elements like links and attachments.
 
@@ -437,7 +438,8 @@ class HTMLParser:
 
         return result.strip(), attachments
 
-    def _roadmap_to_markdown(self, roadmap_data: Dict[str, Any]) -> str:
+    @staticmethod
+    def _roadmap_to_markdown(roadmap_data: Dict[str, Any]) -> str:
         """
         Converts roadmap data to a markdown representation.
 
